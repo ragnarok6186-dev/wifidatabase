@@ -87,6 +87,7 @@ legend { padding: 0; font-size: .72rem; letter-spacing: .07em; text-transform: u
 .sheet form.vform { display: flex; flex-direction: column; gap: 12px; padding-top: 16px; }
 .hint { color: var(--muted); font-size: .8rem; }
 .note { margin: 0; padding: 10px 12px; border-radius: 8px; background: var(--good-soft); color: var(--good); font-size: .9rem; }
+.done .verse { font-family: var(--font-display); font-size: 1.15rem; font-style: italic; color: var(--accent); margin: 4px 0; }
 .linkbtn { all: unset; cursor: pointer; color: var(--accent); }
 @media (max-width: 640px) { .grid { grid-template-columns: minmax(0, 1fr); } }
 
@@ -171,7 +172,9 @@ legend { padding: 0; font-size: .72rem; letter-spacing: .07em; text-transform: u
   </div>
 
   <div class="sheet done" id="doneCard" hidden>
-    <h2 id="doneTitle">Thank you!</h2>
+    <h2 id="doneTitle">Welcome to BS-Wifi family</h2>
+    <h1 id="doneName" style="font-size:clamp(1.6rem,6vw,2.2rem)"></h1>
+    <p class="verse" id="doneVerse">Romans 1:17 (NIV) — The Righteous Will Live by Faith</p>
     <p id="doneText">Your details have been received.</p>
     <button class="linkbtn" type="button" id="againBtn">Back to the form</button>
   </div>
@@ -235,7 +238,9 @@ legend { padding: 0; font-size: .72rem; letter-spacing: .07em; text-transform: u
       op = sb.from("members").insert(toRow(d)).then(function (res) { if (res.error) throw res.error; });
     }
     op.then(function () {
-      $("doneTitle").textContent = wasEdit ? "Details updated" : "Thank you!";
+      $("doneTitle").textContent = wasEdit ? "Details updated" : "Welcome to BS-Wifi family";
+      $("doneName").textContent = wasEdit ? "" : ((d.firstName || "") + " " + (d.surname || "")).trim();
+      $("doneName").hidden = wasEdit; $("doneVerse").hidden = wasEdit;
       $("doneText").textContent = wasEdit ? "Your changes have been saved." : "Your details have been received.";
       $("formCard").hidden = true; $("doneCard").hidden = false;
       window.scrollTo(0, 0);
