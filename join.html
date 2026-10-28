@@ -81,6 +81,12 @@ legend { padding: 0; font-size: .72rem; letter-spacing: .07em; text-transform: u
 .hp { position: absolute; left: -9999px; width: 1px; height: 1px; overflow: hidden; }
 .done { text-align: center; padding: 32px 12px; display: flex; flex-direction: column; gap: 12px; align-items: center; }
 .done p { margin: 0; color: var(--muted); }
+.tabs { display: flex; gap: 6px; background: var(--accent-soft); padding: 4px; border-radius: 10px; }
+.tab { flex: 1; border: 0; background: transparent; border-radius: 7px; padding: 10px 12px; cursor: pointer; font-weight: 500; min-height: 44px; color: var(--muted); }
+.tab.active { background: var(--surface); color: var(--ink); box-shadow: var(--shadow); }
+.sheet form.vform { display: flex; flex-direction: column; gap: 12px; padding-top: 16px; }
+.hint { color: var(--muted); font-size: .8rem; }
+.note { margin: 0; padding: 10px 12px; border-radius: 8px; background: var(--good-soft); color: var(--good); font-size: .9rem; }
 .linkbtn { all: unset; cursor: pointer; color: var(--accent); }
 @media (max-width: 640px) { .grid { grid-template-columns: minmax(0, 1fr); } }
 
@@ -93,7 +99,26 @@ legend { padding: 0; font-size: .72rem; letter-spacing: .07em; text-transform: u
     <p class="intro">Please fill in your details. Only your surname and first name are required; everything else is optional.</p>
   </div>
 
+  <div class="tabs" role="tablist">
+    <button class="tab active" id="tabNew" type="button" role="tab" aria-selected="true">New member</button>
+    <button class="tab" id="tabEdit" type="button" role="tab" aria-selected="false">Update my details</button>
+  </div>
+
+  <div class="sheet" id="verifyCard" hidden>
+    <form class="vform" id="verifyForm" novalidate>
+      <p class="intro" style="margin:0">To update your details, enter your name and date of birth exactly as they are in our records.</p>
+      <div class="grid">
+        <div class="field"><label for="vSurname">Surname</label><input id="vSurname" autocomplete="off" required></div>
+        <div class="field"><label for="vFirst">First name</label><input id="vFirst" autocomplete="off" required></div>
+        <div class="field"><label for="vBirthday">Date of birth</label><input id="vBirthday" type="date" required></div>
+      </div>
+      <p class="msg" id="vMsg" role="alert"></p>
+      <button class="btn" type="submit" id="vBtn">Find my record</button>
+    </form>
+  </div>
+
   <div class="sheet" id="formCard">
+    <p class="note" id="editNote" hidden style="margin-top:16px">We found your record. Update what you need, then save.</p>
     <form id="form" novalidate>
       <div class="hp" aria-hidden="true"><label>Leave this empty <input id="website" name="website" tabindex="-1" autocomplete="off"></label></div>
       <fieldset>
@@ -102,7 +127,7 @@ legend { padding: 0; font-size: .72rem; letter-spacing: .07em; text-transform: u
           <div class="field"><label for="surname">Surname</label><input id="surname" name="surname" autocomplete="off" required></div>
           <div class="field"><label for="firstName">First name</label><input id="firstName" name="firstName" autocomplete="off" required></div>
           <div class="field"><label for="nickname">Nickname <span class="opt">(optional)</span></label><input id="nickname" name="nickname" autocomplete="off"></div>
-          <div class="field"><label for="birthday">Birthday</label><input id="birthday" name="birthday" type="date"></div>
+          <div class="field"><label for="birthday">Birthday</label><input id="birthday" name="birthday" type="date"><span class="hint">Needed if you want to update your details later.</span></div>
         </div>
       </fieldset>
       <fieldset>
@@ -146,9 +171,9 @@ legend { padding: 0; font-size: .72rem; letter-spacing: .07em; text-transform: u
   </div>
 
   <div class="sheet done" id="doneCard" hidden>
-    <h2>Thank you!</h2>
-    <p>Your details have been received.</p>
-    <button class="linkbtn" type="button" id="againBtn">Submit for another person</button>
+    <h2 id="doneTitle">Thank you!</h2>
+    <p id="doneText">Your details have been received.</p>
+    <button class="linkbtn" type="button" id="againBtn">Back to the form</button>
   </div>
 </div>
 
@@ -200,18 +225,70 @@ legend { padding: 0; font-size: .72rem; letter-spacing: .07em; text-transform: u
     if (!d.surname || !d.firstName) { msg.textContent = "Please enter your surname and first name."; (d.surname ? $("firstName") : $("surname")).focus(); return; }
     if (d.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(d.email)) { msg.textContent = "The email address does not look right. Please check it."; $("email").focus(); return; }
     if (!sb) { msg.textContent = "The page could not load. Check your connection and reload."; return; }
-    var btn = $("saveBtn"); btn.disabled = true; btn.textContent = "Submitting...";
-    sb.from("members").insert(toRow(d)).then(function (res) {
-      if (res.error) throw res.error;
+    var btn = $("saveBtn"); btn.disabled = true; btn.textContent = mode === "edit" ? "Saving..." : "Submitting...";
+    var wasEdit = mode === "edit";
+    var op;
+    if (wasEdit) {
+      op = sb.rpc("member_update", { p_surname: verified.surname, p_first: verified.first, p_birthday: verified.birthday, p_data: toRow(d) })
+        .then(function (res) { if (res.error) throw res.error; if (res.data !== true) throw { code: "nomatch" }; });
+    } else {
+      op = sb.from("members").insert(toRow(d)).then(function (res) { if (res.error) throw res.error; });
+    }
+    op.then(function () {
+      $("doneTitle").textContent = wasEdit ? "Details updated" : "Thank you!";
+      $("doneText").textContent = wasEdit ? "Your changes have been saved." : "Your details have been received.";
       $("formCard").hidden = true; $("doneCard").hidden = false;
       window.scrollTo(0, 0);
-    }).catch(function () {
-      msg.textContent = "Sorry, your details could not be submitted. Please try again in a moment.";
-    }).then(function () { btn.disabled = false; btn.textContent = "Submit"; });
+    }).catch(function (e) {
+      msg.textContent = (e && e.code === "nomatch") ? "Your record could not be matched any more. Go back and verify again."
+        : wasEdit ? "Sorry, your changes could not be saved. Please try again in a moment."
+        : "Sorry, your details could not be submitted. Please try again in a moment.";
+    }).then(function () { btn.disabled = false; btn.textContent = mode === "edit" ? "Save changes" : "Submit"; });
   });
-  $("againBtn").addEventListener("click", function () {
+
+  // ---------- new member / update my details ----------
+  var mode = "new", verified = null;
+  function setMode(m) {
+    mode = m; verified = null;
+    $("tabNew").classList.toggle("active", m === "new"); $("tabNew").setAttribute("aria-selected", m === "new");
+    $("tabEdit").classList.toggle("active", m === "edit"); $("tabEdit").setAttribute("aria-selected", m === "edit");
+    $("doneCard").hidden = true;
+    $("verifyCard").hidden = m !== "edit";
+    $("formCard").hidden = m === "edit";
+    $("editNote").hidden = true;
     $("form").reset(); syncConditional();
-    $("doneCard").hidden = true; $("formCard").hidden = false; window.scrollTo(0, 0);
+    $("formMsg").textContent = ""; $("vMsg").textContent = "";
+    $("saveBtn").textContent = m === "edit" ? "Save changes" : "Submit";
+    window.scrollTo(0, 0);
+  }
+  $("tabNew").addEventListener("click", function () { setMode("new"); });
+  $("tabEdit").addEventListener("click", function () { setMode("edit"); });
+  $("againBtn").addEventListener("click", function () { setMode(mode); });
+
+  $("verifyForm").addEventListener("submit", function (ev) {
+    ev.preventDefault();
+    var msg = $("vMsg"); msg.textContent = "";
+    var sn = $("vSurname").value.trim(), fn = $("vFirst").value.trim(), bd = $("vBirthday").value;
+    if (!sn || !fn || !bd) { msg.textContent = "Please enter your surname, first name and date of birth."; return; }
+    if (!sb) { msg.textContent = "The page could not load. Check your connection and reload."; return; }
+    var btn = $("vBtn"); btn.disabled = true; btn.textContent = "Checking...";
+    sb.rpc("member_lookup", { p_surname: sn, p_first: fn, p_birthday: bd }).then(function (res) {
+      if (res.error) throw res.error;
+      var rows = res.data || [];
+      if (rows.length !== 1) { msg.textContent = "We could not find a record that matches these details. Check the spelling and date, or contact the group admin."; return; }
+      var r = rows[0];
+      MAP.forEach(function (p) { $(p[0]).value = r[p[1]] == null ? "" : r[p[1]]; });
+      syncConditional();
+      verified = { surname: sn, first: fn, birthday: bd };
+      $("verifyCard").hidden = true; $("formCard").hidden = false; $("editNote").hidden = false;
+      $("vSurname").value = ""; $("vFirst").value = ""; $("vBirthday").value = "";
+      window.scrollTo(0, 0);
+    }).catch(function (e) {
+      var m = (e && e.message) || "";
+      msg.textContent = (e && (e.code === "PGRST202" || e.code === "42883" || /function/i.test(m)))
+        ? "Updating is not switched on yet. Please contact the group admin."
+        : "Sorry, something went wrong. Please try again in a moment.";
+    }).then(function () { btn.disabled = false; btn.textContent = "Find my record"; });
   });
 
   if (window.supabase && window.supabase.createClient) {
