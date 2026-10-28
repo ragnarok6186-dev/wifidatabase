@@ -169,7 +169,7 @@ legend { padding: 0; font-size: .72rem; letter-spacing: .07em; text-transform: u
     <div id="loginPane">
       <form id="loginForm" novalidate>
         <p>Sign in to see the member directory.</p>
-        <div class="field"><label for="loginEmail">Email</label><input id="loginEmail" type="email" autocomplete="username" required></div>
+        <div class="field"><label for="loginEmail">Username</label><input id="loginEmail" type="text" autocomplete="username" autocapitalize="none" required></div>
         <div class="field"><label for="loginPass">Password</label><input id="loginPass" type="password" autocomplete="current-password" required></div>
         <p class="msg" id="loginMsg" role="alert"></p>
         <button class="btn primary" type="submit" id="loginBtn">Sign in</button>
@@ -331,6 +331,10 @@ legend { padding: 0; font-size: .72rem; letter-spacing: .07em; text-transform: u
   var SUPABASE_KEY = "sb_publishable_UFZVvWkyblaBw9ICLAtW_A_h_8WoWW1";
   // false = no sign-in screen (the database must allow open access, see supabase-open-access.sql). Set to true to bring the sign-in back.
   var REQUIRE_LOGIN = false;
+  // Simple admin gate for this page (not Supabase sign-in). Stores a hash, not the password itself.
+  var ADMIN_GATE = true;
+  var ADMIN_USER = "benj";
+  var ADMIN_HASH = "d20c332006377a536217f4db2c1661d50c6da684f3a5e4005ec8339c8fd3c195";
 
   var $ = function (id) { return document.getElementById(id); };
   var sb = null, session = null;
@@ -903,6 +907,11 @@ legend { padding: 0; font-size: .72rem; letter-spacing: .07em; text-transform: u
     if (!loaded) renderAll();
     loadAll();
   }
+  function sha256Hex(str) {
+    return crypto.subtle.digest("SHA-256", new TextEncoder().encode(str)).then(function (buf) {
+      return Array.prototype.map.call(new Uint8Array(buf), function (b) { return ("0" + b.toString(16)).slice(-2); }).join("");
+    });
+  }
   function showLogin() {
     members = []; loaded = false; loadError = "";
     $("loginPass").value = "";
@@ -913,7 +922,18 @@ legend { padding: 0; font-size: .72rem; letter-spacing: .07em; text-transform: u
     ev.preventDefault();
     var msg = $("loginMsg"); msg.textContent = ""; msg.classList.remove("info");
     var email = $("loginEmail").value.trim(), pass = $("loginPass").value;
-    if (!email || !pass) { msg.textContent = "Enter your email and password."; return; }
+    if (!email || !pass) { msg.textContent = ADMIN_GATE && !REQUIRE_LOGIN ? "Enter your username and password." : "Enter your email and password."; return; }
+    if (ADMIN_GATE && !REQUIRE_LOGIN) {
+      var gbtn = $("loginBtn"); gbtn.disabled = true;
+      sha256Hex(email.toLowerCase() + ":" + pass).then(function (hex) {
+        if (email.toLowerCase() === ADMIN_USER && hex === ADMIN_HASH) {
+          try { sessionStorage.setItem("wifiAdmin", "1"); } catch (e) {}
+          $("loginPass").value = ""; showApp();
+        } else { msg.textContent = "The username or password is not correct."; }
+      }).catch(function () { msg.textContent = "Could not check the password in this browser."; })
+        .then(function () { gbtn.disabled = false; });
+      return;
+    }
     var btn = $("loginBtn"); btn.disabled = true;
     sb.auth.signInWithPassword({ email: email, password: pass }).then(function (res) {
       if (res.error) msg.textContent = /invalid/i.test(res.error.message) ? "The email or password is not correct." : "Could not sign in. " + res.error.message;
@@ -940,7 +960,10 @@ legend { padding: 0; font-size: .72rem; letter-spacing: .07em; text-transform: u
       if (session) showApp(); else showLogin();
     });
   });
-  $("signOutBtn").addEventListener("click", function () { sb.auth.signOut(); });
+  $("signOutBtn").addEventListener("click", function () {
+    if (ADMIN_GATE && !REQUIRE_LOGIN) { try { sessionStorage.removeItem("wifiAdmin"); } catch (e) {} showLogin(); return; }
+    sb.auth.signOut();
+  });
 
   // refresh when returning to the tab, so changes from other devices appear
   document.addEventListener("visibilitychange", function () {
@@ -955,6 +978,12 @@ legend { padding: 0; font-size: .72rem; letter-spacing: .07em; text-transform: u
     if (!REQUIRE_LOGIN) {
       sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { persistSession: false, autoRefreshToken: false } });
       session = {};
+      if (ADMIN_GATE) {
+        $("forgotBtn").hidden = true;
+        var ok = false; try { ok = sessionStorage.getItem("wifiAdmin") === "1"; } catch (e) {}
+        if (ok) showApp(); else showLogin();
+        return;
+      }
       $("signOutBtn").hidden = true;
       showApp();
       return;
