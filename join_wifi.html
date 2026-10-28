@@ -1,0 +1,223 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<title>Member Information Form</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600&family=Newsreader:opsz,wght@6..72,500;6..72,600&display=swap">
+<style>
+:root {
+  color-scheme: light;
+  --bg: #f4f5f8;
+  --surface: #ffffff;
+  --ink: #1b2230;
+  --muted: #5c6579;
+  --line: #dde1ea;
+  --accent: #2b4a9b;
+  --accent-ink: #ffffff;
+  --accent-soft: #e7ecf9;
+  --good: #1f7a4d;
+  --good-soft: #def2e8;
+  --warn: #8a5300;
+  --warn-soft: #fbeccf;
+  --danger: #b3261e;
+  --shadow: 0 1px 2px rgba(20, 30, 60, .06), 0 8px 24px rgba(20, 30, 60, .08);
+  --font-display: "Newsreader", Georgia, "Times New Roman", serif;
+  --font-body: "Instrument Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+    --bg: #12151c; --surface: #1a1f2a; --ink: #e8ebf3; --muted: #9aa3b7; --line: #2c3344;
+    --accent: #93acff; --accent-ink: #0f1730; --accent-soft: #232c4a;
+    --good: #6fd3a0; --good-soft: #17352a; --warn: #f0be6a; --warn-soft: #3b2d12;
+    --danger: #ff9a93;
+    --shadow: 0 1px 2px rgba(0,0,0,.4), 0 8px 24px rgba(0,0,0,.4);
+  }
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0; background: var(--bg); color: var(--ink);
+  font-family: var(--font-body); font-size: 15px; line-height: 1.5;
+  padding-block: 28px 56px;
+  padding-left: max(clamp(16px, 2vw, 40px), env(safe-area-inset-left, 0px));
+  padding-right: max(clamp(16px, 2vw, 40px), env(safe-area-inset-right, 0px));
+}
+.wrap { max-width: 2200px; margin: 0 auto; display: flex; flex-direction: column; gap: 20px; }
+h1, h2 { font-family: var(--font-display); font-weight: 600; margin: 0; text-wrap: balance; }
+h1 { font-size: clamp(1.8rem, 4vw, 2.4rem); line-height: 1.1; letter-spacing: -.01em; }
+h2 { font-size: 1.25rem; }
+button, input, select { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html { -webkit-text-size-adjust: 100%; }
+body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--font-body); font-size: 15px; line-height: 1.5;
+  padding-block: 28px 56px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+.wrap { max-width: 720px; margin: 0 auto; display: flex; flex-direction: column; gap: 20px; }
+h1, h2 { font-family: var(--font-display); font-weight: 600; margin: 0; text-wrap: balance; }
+h1 { font-size: clamp(1.8rem, 4vw, 2.4rem); line-height: 1.1; }
+button, input, select { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.intro { color: var(--muted); margin: 8px 0 0; }
+.sheet { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; box-shadow: var(--shadow); padding: 8px 20px 20px; }
+fieldset { border: 0; margin: 0; padding: 14px 0 6px; min-width: 0; }
+legend { padding: 0; font-size: .72rem; letter-spacing: .07em; text-transform: uppercase; color: var(--accent); font-weight: 600; margin-bottom: 10px; }
+.grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.field { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.field label { font-size: .85rem; font-weight: 500; }
+.field .opt { color: var(--muted); font-weight: 400; }
+.field input, .field select { width: 100%; border: 1px solid var(--line); background: var(--surface); border-radius: 8px; padding: 9px 10px; min-height: 44px; }
+.btn { border: 1px solid var(--accent); background: var(--accent); color: var(--accent-ink); border-radius: 8px; padding: 10px 18px; cursor: pointer; font-weight: 500; min-height: 44px; }
+.btn[disabled] { opacity: .55; cursor: default; }
+.msg { min-height: 1.4em; margin: 8px 0; font-size: .9rem; color: var(--danger); }
+.hp { position: absolute; left: -9999px; width: 1px; height: 1px; overflow: hidden; }
+.done { text-align: center; padding: 32px 12px; display: flex; flex-direction: column; gap: 12px; align-items: center; }
+.done p { margin: 0; color: var(--muted); }
+.linkbtn { all: unset; cursor: pointer; color: var(--accent); }
+@media (max-width: 640px) { .grid { grid-template-columns: minmax(0, 1fr); } }
+
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div>
+    <h1>Member Information Form</h1>
+    <p class="intro">Please fill in your details. Only your surname and first name are required; everything else is optional.</p>
+  </div>
+
+  <div class="sheet" id="formCard">
+    <form id="form" novalidate>
+      <div class="hp" aria-hidden="true"><label>Leave this empty <input id="website" name="website" tabindex="-1" autocomplete="off"></label></div>
+      <fieldset>
+        <legend>Person</legend>
+        <div class="grid">
+          <div class="field"><label for="surname">Surname</label><input id="surname" name="surname" autocomplete="off" required></div>
+          <div class="field"><label for="firstName">First name</label><input id="firstName" name="firstName" autocomplete="off" required></div>
+          <div class="field"><label for="nickname">Nickname <span class="opt">(optional)</span></label><input id="nickname" name="nickname" autocomplete="off"></div>
+          <div class="field"><label for="birthday">Birthday</label><input id="birthday" name="birthday" type="date"></div>
+        </div>
+      </fieldset>
+      <fieldset>
+        <legend>Family</legend>
+        <div class="grid">
+          <div class="field"><label for="civil">Civil status</label>
+            <select id="civil" name="civil"><option value="">Select</option><option>Single</option><option>Married</option><option>Widowed</option><option>Separated</option><option>Divorced</option></select></div>
+          <div class="field" id="annivWrap" hidden><label for="anniv">Wedding anniversary</label><input id="anniv" name="anniv" type="date"></div>
+          <div class="field"><label for="children">No. of children</label><input id="children" name="children" type="number" min="0" max="30" inputmode="numeric"></div>
+        </div>
+      </fieldset>
+      <fieldset>
+        <legend>Contact</legend>
+        <div class="grid">
+          <div class="field"><label for="mobile">Mobile no.</label><input id="mobile" name="mobile" type="tel" autocomplete="off" placeholder="+971 50 123 4567"></div>
+          <div class="field"><label for="email">Email address</label><input id="email" name="email" type="email" autocomplete="off"></div>
+        </div>
+      </fieldset>
+      <fieldset>
+        <legend>Church</legend>
+        <div class="grid">
+          <div class="field"><label for="group">BS Group</label><input id="group" name="group" autocomplete="off"></div>
+          <div class="field"><label for="aux">Auxiliary</label><input id="aux" name="aux" autocomplete="off"></div>
+          <div class="field"><label for="role">Board / Member</label>
+            <select id="role" name="role"><option value="">Select</option><option>Board</option><option>Member</option></select></div>
+          <div class="field"><label for="yearJoined">Year joined FCC</label><input id="yearJoined" name="yearJoined" type="number" min="1950" max="2100" inputmode="numeric" placeholder="2019"></div>
+          <div class="field"><label for="loc">Location / Emirate</label>
+            <select id="loc" name="loc"><option value="">Select</option><option>Abu Dhabi</option><option>Dubai</option><option>Sharjah</option><option>Ajman</option><option>Umm Al Quwain</option><option>Ras Al Khaimah</option><option>Fujairah</option><option>Outside UAE</option></select></div>
+          <div class="field"><label for="cgm">CGM</label>
+            <select id="cgm" name="cgm"><option value="">Select</option><option>Yes</option><option>No</option></select></div>
+          <div class="field" id="cgmYearWrap" hidden><label for="cgmYear">CGM year</label><input id="cgmYear" name="cgmYear" type="number" min="1900" max="2100" inputmode="numeric" placeholder="2021"></div>
+          <div class="field"><label for="bap">Baptism</label>
+            <select id="bap" name="bap"><option value="">Select</option><option>Yes</option><option>No</option></select></div>
+          <div class="field" id="bapYearWrap" hidden><label for="bapYear">Baptism year</label><input id="bapYear" name="bapYear" type="number" min="1900" max="2100" inputmode="numeric" placeholder="2020"></div>
+        </div>
+      </fieldset>
+      
+      <p class="msg" id="formMsg" role="alert"></p>
+      <button class="btn" type="submit" id="saveBtn">Submit</button>
+    </form>
+  </div>
+
+  <div class="sheet done" id="doneCard" hidden>
+    <h2>Thank you!</h2>
+    <p>Your details have been received.</p>
+    <button class="linkbtn" type="button" id="againBtn">Submit for another person</button>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<script>
+(function () {
+  var SUPABASE_URL = "https://dabbzcyyrnhmeaiytmbe.supabase.co";
+  var SUPABASE_KEY = "sb_publishable_UFZVvWkyblaBw9ICLAtW_A_h_8WoWW1";
+  var $ = function (id) { return document.getElementById(id); };
+  var sb = null;
+  var MAP = [
+    ["surname","surname"],["firstName","first_name"],["nickname","nickname"],["birthday","birthday"],
+    ["civil","civil_status"],["anniv","wedding_anniversary"],["children","children"],["mobile","mobile"],
+    ["email","email"],["group","bs_group"],["aux","auxiliary"],["role","role"],["yearJoined","year_joined"],
+    ["loc","location"],["cgm","cgm"],["cgmYear","cgm_year"],["bap","baptism"],["bapYear","baptism_year"]
+  ];
+  var NUMERIC = { children: 1, yearJoined: 1, cgmYear: 1, bapYear: 1 };
+  function syncConditional() {
+    $("annivWrap").hidden = $("civil").value !== "Married";
+    $("cgmYearWrap").hidden = $("cgm").value !== "Yes";
+    $("bapYearWrap").hidden = $("bap").value !== "Yes";
+  }
+  ["civil","cgm","bap"].forEach(function (id) { $(id).addEventListener("change", syncConditional); });
+  syncConditional();
+
+  function collect() {
+    var d = {};
+    MAP.forEach(function (p) {
+      var raw = $(p[0]).value.trim();
+      d[p[0]] = NUMERIC[p[0]] ? (raw === "" ? null : Number(raw)) : raw;
+    });
+    if (d.civil !== "Married") d.anniv = "";
+    if (d.cgm !== "Yes") d.cgmYear = null;
+    if (d.bap !== "Yes") d.bapYear = null;
+    return d;
+  }
+  function toRow(d) {
+    var row = {};
+    MAP.forEach(function (p) { var v = d[p[0]]; row[p[1]] = (v === "" || v === undefined || v === null) ? null : v; });
+    row.updated_at = new Date().toISOString();
+    return row;
+  }
+
+  $("form").addEventListener("submit", function (ev) {
+    ev.preventDefault();
+    var msg = $("formMsg"); msg.textContent = "";
+    if ($("website").value) return; // spam trap
+    var d = collect();
+    if (!d.surname || !d.firstName) { msg.textContent = "Please enter your surname and first name."; (d.surname ? $("firstName") : $("surname")).focus(); return; }
+    if (d.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(d.email)) { msg.textContent = "The email address does not look right. Please check it."; $("email").focus(); return; }
+    if (!sb) { msg.textContent = "The page could not load. Check your connection and reload."; return; }
+    var btn = $("saveBtn"); btn.disabled = true; btn.textContent = "Submitting...";
+    sb.from("members").insert(toRow(d)).then(function (res) {
+      if (res.error) throw res.error;
+      $("formCard").hidden = true; $("doneCard").hidden = false;
+      window.scrollTo(0, 0);
+    }).catch(function () {
+      msg.textContent = "Sorry, your details could not be submitted. Please try again in a moment.";
+    }).then(function () { btn.disabled = false; btn.textContent = "Submit"; });
+  });
+  $("againBtn").addEventListener("click", function () {
+    $("form").reset(); syncConditional();
+    $("doneCard").hidden = true; $("formCard").hidden = false; window.scrollTo(0, 0);
+  });
+
+  if (window.supabase && window.supabase.createClient) {
+    sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { persistSession: false, autoRefreshToken: false } });
+  }
+})();
+</script>
+</body>
+</html>

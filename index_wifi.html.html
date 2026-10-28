@@ -1,0 +1,978 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<title>WiFi Group Directory</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600&family=Newsreader:opsz,wght@6..72,500;6..72,600&display=swap">
+<style>
+/* Layout: sign-in screen, then one working column: header, stats line, upcoming dates, filters, member table (cards on phones). Form and import open as modal sheets. */
+:root {
+  color-scheme: light;
+  --bg: #f4f5f8;
+  --surface: #ffffff;
+  --ink: #1b2230;
+  --muted: #5c6579;
+  --line: #dde1ea;
+  --accent: #2b4a9b;
+  --accent-ink: #ffffff;
+  --accent-soft: #e7ecf9;
+  --good: #1f7a4d;
+  --good-soft: #def2e8;
+  --warn: #8a5300;
+  --warn-soft: #fbeccf;
+  --danger: #b3261e;
+  --shadow: 0 1px 2px rgba(20, 30, 60, .06), 0 8px 24px rgba(20, 30, 60, .08);
+  --font-display: "Newsreader", Georgia, "Times New Roman", serif;
+  --font-body: "Instrument Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+    --bg: #12151c; --surface: #1a1f2a; --ink: #e8ebf3; --muted: #9aa3b7; --line: #2c3344;
+    --accent: #93acff; --accent-ink: #0f1730; --accent-soft: #232c4a;
+    --good: #6fd3a0; --good-soft: #17352a; --warn: #f0be6a; --warn-soft: #3b2d12;
+    --danger: #ff9a93;
+    --shadow: 0 1px 2px rgba(0,0,0,.4), 0 8px 24px rgba(0,0,0,.4);
+  }
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0; background: var(--bg); color: var(--ink);
+  font-family: var(--font-body); font-size: 15px; line-height: 1.5;
+  padding-block: 28px 56px;
+  padding-left: max(clamp(16px, 2vw, 40px), env(safe-area-inset-left, 0px));
+  padding-right: max(clamp(16px, 2vw, 40px), env(safe-area-inset-right, 0px));
+}
+.wrap { max-width: 2200px; margin: 0 auto; display: flex; flex-direction: column; gap: 20px; }
+h1, h2 { font-family: var(--font-display); font-weight: 600; margin: 0; text-wrap: balance; }
+h1 { font-size: clamp(1.8rem, 4vw, 2.4rem); line-height: 1.1; letter-spacing: -.01em; }
+h2 { font-size: 1.25rem; }
+button, input, select { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* sign-in */
+.auth { min-height: 70vh; display: flex; align-items: center; justify-content: center; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; box-shadow: var(--shadow); padding: 24px; width: 100%; max-width: 400px; display: flex; flex-direction: column; gap: 14px; }
+.card p { margin: 0; color: var(--muted); }
+.card form { display: flex; flex-direction: column; gap: 12px; }
+.linkbtn { all: unset; cursor: pointer; color: var(--accent); font-size: .9rem; align-self: flex-start; }
+.linkbtn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+
+/* header */
+.head { display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-end; justify-content: space-between; }
+.head p { margin: 6px 0 0; color: var(--muted); max-width: 56ch; overflow-wrap: anywhere; }
+.actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.btn { border: 1px solid var(--line); background: var(--surface); border-radius: 8px; padding: 9px 14px; cursor: pointer; font-weight: 500; min-height: 40px; }
+.btn:hover { border-color: var(--accent); }
+.btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.btn.primary:hover { filter: brightness(1.08); }
+.btn.danger { color: var(--danger); }
+.btn.danger.armed { background: var(--danger); color: var(--surface); border-color: var(--danger); }
+.btn[disabled] { opacity: .55; cursor: default; }
+
+/* stats */
+.stats { display: flex; flex-wrap: wrap; gap: 8px 28px; padding: 14px 0; border-block: 1px solid var(--line); }
+.stat { display: flex; align-items: baseline; gap: 8px; }
+.stat b { font-family: var(--font-display); font-size: 1.6rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+.stat span { color: var(--muted); font-size: .9rem; }
+
+/* upcoming */
+.upcoming { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 16px; }
+.upcoming h2 { margin-bottom: 10px; }
+.upcoming ul { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 8px; }
+.upcoming li { display: flex; gap: 10px; align-items: center; padding: 8px 10px; border-radius: 8px; background: var(--accent-soft); min-width: 0; }
+.upcoming .kind { font-size: .72rem; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--accent); flex: none; }
+.upcoming .who { font-weight: 500; overflow-wrap: anywhere; min-width: 0; }
+.upcoming .when { margin-left: auto; color: var(--muted); font-size: .85rem; flex: none; font-variant-numeric: tabular-nums; }
+.upcoming .none { color: var(--muted); margin: 0; }
+
+/* toolbar */
+.tools { display: grid; grid-template-columns: minmax(200px, 2fr) repeat(5, minmax(120px, 1fr)); gap: 8px; align-items: center; }
+.field input, .field select, .tools input, .tools select { width: 100%; border: 1px solid var(--line); background: var(--surface); border-radius: 8px; padding: 9px 10px; min-height: 40px; }
+
+/* table */
+.tablebox { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; min-width: 880px; }
+th { text-align: left; font-size: .72rem; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); font-weight: 600; padding: 12px 14px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+td { padding: 12px 14px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+tbody tr:last-child td { border-bottom: 0; }
+tbody tr { cursor: pointer; }
+tbody tr:hover { background: var(--accent-soft); }
+.name-btn { all: unset; cursor: pointer; font-weight: 600; display: block; }
+.name-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+.nick { color: var(--muted); font-weight: 400; }
+.sub { color: var(--muted); font-size: .85rem; overflow-wrap: anywhere; }
+.pill { display: inline-block; padding: 2px 9px; border-radius: 999px; font-size: .8rem; font-weight: 600; }
+.pill.yes { background: var(--good-soft); color: var(--good); }
+.pill.no { background: var(--warn-soft); color: var(--warn); }
+.pill.na { background: var(--line); color: var(--muted); }
+.num { font-variant-numeric: tabular-nums; }
+.count { color: var(--muted); font-size: .9rem; }
+.state { padding: 40px 20px; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 10px; }
+.state p { margin: 0; color: var(--muted); max-width: 46ch; }
+
+/* modal */
+.overlay { position: fixed; inset: 0; background: rgba(10, 14, 24, .55); z-index: 20; display: flex; align-items: flex-start; justify-content: center; overflow-y: auto;
+  padding-block: max(16px, env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-bottom, 0px));
+  padding-left: max(12px, env(safe-area-inset-left, 0px)); padding-right: max(12px, env(safe-area-inset-right, 0px)); }
+.sheet { background: var(--surface); width: 100%; max-width: 720px; border-radius: 14px; box-shadow: var(--shadow); margin: auto; }
+.sheet header { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 18px 20px; border-bottom: 1px solid var(--line); }
+.sheet form { padding: 4px 20px 20px; display: flex; flex-direction: column; gap: 4px; }
+fieldset { border: 0; margin: 0; padding: 14px 0 6px; min-width: 0; }
+legend { padding: 0; font-size: .72rem; letter-spacing: .07em; text-transform: uppercase; color: var(--accent); font-weight: 600; margin-bottom: 10px; }
+.grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.field { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.field label { font-size: .85rem; font-weight: 500; }
+.field .opt { color: var(--muted); font-weight: 400; }
+.msg { min-height: 1.4em; margin: 0; font-size: .9rem; color: var(--danger); }
+.msg.info { color: var(--muted); }
+.foot { display: flex; flex-wrap: wrap; gap: 8px; justify-content: space-between; padding-top: 8px; }
+.foot .right { display: flex; gap: 8px; margin-left: auto; }
+.imp { padding: 16px 20px 20px; display: flex; flex-direction: column; gap: 12px; }
+.imp p { margin: 0; }
+.imp ul { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 4px; }
+.imp .muted { color: var(--muted); font-size: .9rem; }
+.imp .good { color: var(--good); font-weight: 600; }
+.toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: max(20px, env(safe-area-inset-bottom, 0px)); background: var(--ink); color: var(--bg); padding: 10px 16px; border-radius: 999px; z-index: 30; font-size: .9rem; box-shadow: var(--shadow); max-width: calc(100% - 32px); }
+
+@media (max-width: 960px) { .tools { grid-template-columns: repeat(3, minmax(0, 1fr)); } .tools .search { grid-column: 1 / -1; } }
+@media (max-width: 760px) {
+  .grid { grid-template-columns: minmax(0, 1fr); }
+  .tools { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .tablebox { overflow: visible; background: transparent; border: 0; }
+  table, tbody { display: block; min-width: 0; }
+  thead { display: none; }
+  tbody { display: flex; flex-direction: column; gap: 10px; }
+  tbody tr { display: block; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 6px 14px; }
+  td { display: flex; justify-content: space-between; gap: 16px; padding: 7px 0; border: 0; text-align: right; }
+  td::before { content: attr(data-label); color: var(--muted); font-size: .8rem; text-align: left; flex: none; }
+  td.first { display: block; text-align: left; padding: 8px 0 6px; border-bottom: 1px solid var(--line); margin-bottom: 4px; }
+  td.first::before { content: none; }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+</style>
+</head>
+<body>
+
+<!-- Sign in / reset password -->
+<div class="wrap auth" id="authView" hidden>
+  <div class="card">
+    <div>
+      <h1>WiFi Group Directory</h1>
+    </div>
+    <div id="loginPane">
+      <form id="loginForm" novalidate>
+        <p>Sign in to see the member directory.</p>
+        <div class="field"><label for="loginEmail">Email</label><input id="loginEmail" type="email" autocomplete="username" required></div>
+        <div class="field"><label for="loginPass">Password</label><input id="loginPass" type="password" autocomplete="current-password" required></div>
+        <p class="msg" id="loginMsg" role="alert"></p>
+        <button class="btn primary" type="submit" id="loginBtn">Sign in</button>
+        <button class="linkbtn" type="button" id="forgotBtn">Forgot your password?</button>
+      </form>
+    </div>
+    <div id="resetPane" hidden>
+      <form id="resetForm" novalidate>
+        <p>Choose a new password.</p>
+        <div class="field"><label for="newPass">New password</label><input id="newPass" type="password" autocomplete="new-password" minlength="8" required></div>
+        <p class="msg" id="resetMsg" role="alert"></p>
+        <button class="btn primary" type="submit" id="resetBtn">Save password</button>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Directory -->
+<div class="wrap" id="appView" hidden>
+  <div class="head">
+    <div>
+      <h1>WiFi Group Directory</h1>
+      <p id="whoami">Member records for the group.</p>
+    </div>
+    <div class="actions">
+      <button class="btn" id="importBtn" type="button">Import Excel</button>
+      <button class="btn" id="exportBtn" type="button">Export Excel</button>
+      <button class="btn" id="shareBtn" type="button">Copy form link</button>
+      <button class="btn primary" id="addBtn" type="button">Add member</button>
+      <button class="btn" id="signOutBtn" type="button">Sign out</button>
+    </div>
+  </div>
+
+  <div class="stats" id="stats" aria-live="polite"></div>
+
+  <section class="upcoming" aria-labelledby="upTitle">
+    <h2 id="upTitle">Birthdays and anniversaries in the next 30 days</h2>
+    <ul id="upList"></ul>
+    <p class="none" id="upNone" hidden>Nothing coming up. Dates appear here once members have a birthday or wedding anniversary saved.</p>
+  </section>
+
+  <div class="tools" role="search">
+    <input class="search" id="q" type="search" placeholder="Search name, nickname, mobile or email" aria-label="Search members">
+    <select id="fGroup" aria-label="Filter by BS Group"></select>
+    <select id="fAux" aria-label="Filter by Auxiliary"></select>
+    <select id="fLoc" aria-label="Filter by Location"></select>
+    <select id="fCgm" aria-label="Filter by CGM">
+      <option value="">CGM: any</option><option value="Yes">CGM: Yes</option><option value="No">CGM: No</option>
+    </select>
+    <select id="fBap" aria-label="Filter by Baptism">
+      <option value="">Baptism: any</option><option value="Yes">Baptism: Yes</option><option value="No">Baptism: No</option>
+    </select>
+  </div>
+  <div class="count" id="count" aria-live="polite"></div>
+
+  <div class="tablebox" id="tableBox">
+    <table>
+      <thead>
+        <tr><th>Name</th><th>BS Group</th><th>Auxiliary</th><th>Role</th><th>Location</th><th>Mobile</th><th>CGM</th><th>Baptism</th><th>Joined</th></tr>
+      </thead>
+      <tbody id="rows"></tbody>
+    </table>
+  </div>
+  <div class="state tablebox" id="emptyState" hidden></div>
+</div>
+
+<!-- Member form -->
+<div class="overlay" id="overlay" hidden>
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="sheetTitle">
+    <header>
+      <h2 id="sheetTitle">Add member</h2>
+      <button class="btn" type="button" id="closeBtn">Close</button>
+    </header>
+    <form id="form" novalidate>
+      <fieldset>
+        <legend>Person</legend>
+        <div class="grid">
+          <div class="field"><label for="surname">Surname</label><input id="surname" name="surname" autocomplete="off" required></div>
+          <div class="field"><label for="firstName">First name</label><input id="firstName" name="firstName" autocomplete="off" required></div>
+          <div class="field"><label for="nickname">Nickname <span class="opt">(optional)</span></label><input id="nickname" name="nickname" autocomplete="off"></div>
+          <div class="field"><label for="birthday">Birthday</label><input id="birthday" name="birthday" type="date"></div>
+        </div>
+      </fieldset>
+      <fieldset>
+        <legend>Family</legend>
+        <div class="grid">
+          <div class="field"><label for="civil">Civil status</label>
+            <select id="civil" name="civil"><option value="">Select</option><option>Single</option><option>Married</option><option>Widowed</option><option>Separated</option><option>Divorced</option></select></div>
+          <div class="field" id="annivWrap" hidden><label for="anniv">Wedding anniversary</label><input id="anniv" name="anniv" type="date"></div>
+          <div class="field"><label for="children">No. of children</label><input id="children" name="children" type="number" min="0" max="30" inputmode="numeric"></div>
+        </div>
+      </fieldset>
+      <fieldset>
+        <legend>Contact</legend>
+        <div class="grid">
+          <div class="field"><label for="mobile">Mobile no.</label><input id="mobile" name="mobile" type="tel" autocomplete="off" placeholder="+971 50 123 4567"></div>
+          <div class="field"><label for="email">Email address</label><input id="email" name="email" type="email" autocomplete="off"></div>
+        </div>
+      </fieldset>
+      <fieldset>
+        <legend>Church</legend>
+        <div class="grid">
+          <div class="field"><label for="group">BS Group</label><input id="group" name="group" list="groupList" autocomplete="off"><datalist id="groupList"></datalist></div>
+          <div class="field"><label for="aux">Auxiliary</label><input id="aux" name="aux" list="auxList" autocomplete="off"><datalist id="auxList"></datalist></div>
+          <div class="field"><label for="role">Board / Member</label>
+            <select id="role" name="role"><option value="">Select</option><option>Board</option><option>Member</option></select></div>
+          <div class="field"><label for="yearJoined">Year joined FCC</label><input id="yearJoined" name="yearJoined" type="number" min="1950" max="2100" inputmode="numeric" placeholder="2019"></div>
+          <div class="field"><label for="loc">Location / Emirate</label>
+            <select id="loc" name="loc"><option value="">Select</option><option>Abu Dhabi</option><option>Dubai</option><option>Sharjah</option><option>Ajman</option><option>Umm Al Quwain</option><option>Ras Al Khaimah</option><option>Fujairah</option><option>Outside UAE</option></select></div>
+          <div class="field"><label for="cgm">CGM</label>
+            <select id="cgm" name="cgm"><option value="">Select</option><option>Yes</option><option>No</option></select></div>
+          <div class="field" id="cgmYearWrap" hidden><label for="cgmYear">CGM year</label><input id="cgmYear" name="cgmYear" type="number" min="1900" max="2100" inputmode="numeric" placeholder="2021"></div>
+          <div class="field"><label for="bap">Baptism</label>
+            <select id="bap" name="bap"><option value="">Select</option><option>Yes</option><option>No</option></select></div>
+          <div class="field" id="bapYearWrap" hidden><label for="bapYear">Baptism year</label><input id="bapYear" name="bapYear" type="number" min="1900" max="2100" inputmode="numeric" placeholder="2020"></div>
+        </div>
+      </fieldset>
+      <p class="msg" id="formMsg" role="alert"></p>
+      <div class="foot">
+        <button class="btn danger" type="button" id="delBtn" hidden>Delete member</button>
+        <div class="right">
+          <button class="btn" type="button" id="cancelBtn">Cancel</button>
+          <button class="btn primary" type="submit" id="saveBtn">Save member</button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Import -->
+<div class="overlay" id="impOverlay" hidden>
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="impTitle">
+    <header>
+      <h2 id="impTitle">Import from Excel or CSV</h2>
+      <button class="btn" type="button" id="impClose">Close</button>
+    </header>
+    <div class="imp">
+      <div id="impBody"></div>
+      <p class="msg" id="impMsg" role="alert"></p>
+      <div class="foot">
+        <button class="btn" type="button" id="tplBtn">Download blank template</button>
+        <div class="right">
+          <button class="btn" type="button" id="impCancel">Cancel</button>
+          <button class="btn primary" type="button" id="impGo">Choose file</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<input type="file" id="impFile" accept=".xlsx,.xls,.csv" hidden>
+<div class="toast" id="toast" role="status" hidden></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script>
+(function () {
+  // ---- Supabase project settings (the publishable key is meant for browser pages; row-level security protects the data) ----
+  var SUPABASE_URL = "https://dabbzcyyrnhmeaiytmbe.supabase.co";
+  var SUPABASE_KEY = "sb_publishable_UFZVvWkyblaBw9ICLAtW_A_h_8WoWW1";
+  // false = no sign-in screen (the database must allow open access, see supabase-open-access.sql). Set to true to bring the sign-in back.
+  var REQUIRE_LOGIN = false;
+
+  var $ = function (id) { return document.getElementById(id); };
+  var sb = null, session = null;
+  var members = [], loaded = false, loadError = "", editingId = null, delTimer = null, toastTimer = null, busyLoading = false;
+
+  function h(tag, props) {
+    var e = document.createElement(tag);
+    props = props || {};
+    Object.keys(props).forEach(function (k) {
+      var v = props[k];
+      if (k === "class") e.className = v;
+      else if (k === "text") e.textContent = v;
+      else if (k.indexOf("on") === 0) e.addEventListener(k.slice(2), v);
+      else e.setAttribute(k, v);
+    });
+    for (var i = 2; i < arguments.length; i++) {
+      var kid = arguments[i];
+      if (Array.isArray(kid)) kid.forEach(function (x) { e.append(x); });
+      else if (kid != null) e.append(kid);
+    }
+    return e;
+  }
+  function toast(text) {
+    var t = $("toast");
+    t.textContent = text; t.hidden = false;
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { t.hidden = true; }, 3200);
+  }
+  function parseDate(iso) {
+    if (!iso) return null;
+    var p = String(iso).split("-").map(Number);
+    if (p.length < 3 || !p[0]) return null;
+    return { y: p[0], m: p[1], d: p[2] };
+  }
+  function fmtDay(m, d) { return new Date(2024, m - 1, d).toLocaleDateString("en-GB", { day: "numeric", month: "short" }); }
+  function fullName(m) { return ((m.firstName || "") + " " + (m.surname || "")).trim() || "Unnamed"; }
+
+  // ---------- database mapping ----------
+  var MAP = [
+    ["surname", "surname"], ["firstName", "first_name"], ["nickname", "nickname"], ["birthday", "birthday"],
+    ["civil", "civil_status"], ["anniv", "wedding_anniversary"], ["children", "children"], ["mobile", "mobile"],
+    ["email", "email"], ["group", "bs_group"], ["aux", "auxiliary"], ["role", "role"], ["yearJoined", "year_joined"],
+    ["loc", "location"], ["cgm", "cgm"], ["cgmYear", "cgm_year"], ["bap", "baptism"], ["bapYear", "baptism_year"]
+  ];
+  var NUMERIC = { children: 1, yearJoined: 1, cgmYear: 1, bapYear: 1 };
+  function toRow(m) {
+    var row = {};
+    MAP.forEach(function (p) {
+      var v = m[p[0]];
+      row[p[1]] = (v === "" || v === undefined || v === null) ? null : v;
+    });
+    row.updated_at = new Date().toISOString();
+    return row;
+  }
+  function fromRow(r) {
+    var m = { id: r.id };
+    MAP.forEach(function (p) {
+      var v = r[p[1]];
+      m[p[0]] = v == null ? (NUMERIC[p[0]] ? null : "") : v;
+    });
+    return m;
+  }
+  function dbMessage(e) {
+    var code = e && e.code, msg = (e && e.message) || "";
+    if (code === "42501" || /row-level security|permission denied/i.test(msg)) return "You do not have permission to change members. Sign in again, or check the Supabase setup.";
+    if (code === "42P01" || /does not exist|schema cache/i.test(msg)) return "The members table was not found. Run the setup SQL in Supabase first.";
+    if (/jwt|token/i.test(msg)) return "Your sign-in expired. Sign out and sign in again.";
+    if (/fetch|network/i.test(msg)) return "Could not reach the database. Check your connection and try again.";
+    return "The change could not be saved. " + (msg ? "(" + msg + ")" : "");
+  }
+
+  function loadAll() {
+    if (!sb || !session || busyLoading) return Promise.resolve();
+    busyLoading = true;
+    var all = [], from = 0, page = 1000;
+    function step() {
+      return sb.from("members").select("*").order("surname", { ascending: true }).order("first_name", { ascending: true }).range(from, from + page - 1)
+        .then(function (res) {
+          if (res.error) throw res.error;
+          all = all.concat(res.data || []);
+          if (res.data && res.data.length === page) { from += page; return step(); }
+        });
+    }
+    return step().then(function () {
+      members = all.map(fromRow); loaded = true; loadError = "";
+    }).catch(function (e) {
+      loaded = true; loadError = dbMessage(e);
+    }).then(function () { busyLoading = false; renderAll(); });
+  }
+
+  // ---------- upcoming dates ----------
+  function upcoming() {
+    var today = new Date(); today = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    var out = [];
+    members.forEach(function (m) {
+      [["Birthday", m.birthday], ["Anniversary", m.civil === "Married" ? m.anniv : ""]].forEach(function (pair) {
+        var p = parseDate(pair[1]);
+        if (!p) return;
+        var next = new Date(today.getFullYear(), p.m - 1, p.d);
+        if (next < today) next = new Date(today.getFullYear() + 1, p.m - 1, p.d);
+        var days = Math.round((next - today) / 86400000);
+        if (days <= 30) out.push({ kind: pair[0], full: fullName(m), m: p.m, d: p.d, days: days });
+      });
+    });
+    out.sort(function (a, b) { return a.days - b.days; });
+    return out;
+  }
+  function renderUpcoming() {
+    var list = $("upList"); list.textContent = "";
+    var items = upcoming().slice(0, 12);
+    $("upNone").hidden = items.length > 0;
+    items.forEach(function (it) {
+      var when = it.days === 0 ? "Today" : it.days === 1 ? "Tomorrow" : fmtDay(it.m, it.d);
+      list.append(h("li", {},
+        h("span", { class: "kind", text: it.kind === "Birthday" ? "Birthday" : "Anniv." }),
+        h("span", { class: "who", text: it.full }),
+        h("span", { class: "when", text: when })));
+    });
+  }
+
+  // ---------- stats + filters ----------
+  function uniq(field) {
+    var seen = {};
+    members.forEach(function (m) { var v = (m[field] || "").trim(); if (v) seen[v] = true; });
+    return Object.keys(seen).sort(function (a, b) { return a.localeCompare(b, undefined, { numeric: true }); });
+  }
+  function renderStats() {
+    var total = members.length;
+    var cgm = members.filter(function (m) { return m.cgm === "Yes"; }).length;
+    var bap = members.filter(function (m) { return m.bap === "Yes"; }).length;
+    var box = $("stats"); box.textContent = "";
+    [[total, "members"], [uniq("group").length, "BS groups"], [cgm, "in a CGM"], [bap, "baptized"]].forEach(function (s) {
+      box.append(h("div", { class: "stat" }, h("b", { text: String(s[0]) }), h("span", { text: s[1] })));
+    });
+  }
+  function fillSelect(id, label, values) {
+    var sel = $(id), cur = sel.value;
+    sel.textContent = "";
+    sel.append(h("option", { value: "", text: label + ": any" }));
+    values.forEach(function (v) { sel.append(h("option", { value: v, text: v })); });
+    if (values.indexOf(cur) >= 0) sel.value = cur;
+  }
+  function fillDatalist(id, values) {
+    var dl = $(id); dl.textContent = "";
+    values.forEach(function (v) { dl.append(h("option", { value: v })); });
+  }
+  function renderFilters() {
+    fillSelect("fGroup", "BS Group", uniq("group"));
+    fillSelect("fAux", "Auxiliary", uniq("aux"));
+    fillSelect("fLoc", "Location", uniq("loc"));
+    fillDatalist("groupList", uniq("group"));
+    fillDatalist("auxList", uniq("aux"));
+  }
+  function filtered() {
+    var q = $("q").value.trim().toLowerCase();
+    var g = $("fGroup").value, a = $("fAux").value, l = $("fLoc").value, c = $("fCgm").value, b = $("fBap").value;
+    return members.filter(function (m) {
+      if (g && m.group !== g) return false;
+      if (a && m.aux !== a) return false;
+      if (l && m.loc !== l) return false;
+      if (c && m.cgm !== c) return false;
+      if (b && m.bap !== b) return false;
+      if (q) {
+        var hay = [m.surname, m.firstName, m.nickname, m.mobile, m.email].join(" ").toLowerCase();
+        if (hay.indexOf(q) < 0) return false;
+      }
+      return true;
+    }).sort(function (x, y) {
+      return (x.surname || "").localeCompare(y.surname || "") || (x.firstName || "").localeCompare(y.firstName || "");
+    });
+  }
+  function yn(v) {
+    if (v === "Yes") return h("span", { class: "pill yes", text: "Yes" });
+    if (v === "No") return h("span", { class: "pill no", text: "No" });
+    return h("span", { class: "pill na", text: "Not set" });
+  }
+  function plain(v) { return v ? v : "-"; }
+
+  function renderTable() {
+    var rows = filtered(), body = $("rows"), empty = $("emptyState");
+    body.textContent = "";
+    var showTable = loaded && !loadError && rows.length > 0;
+    $("tableBox").hidden = !showTable;
+    empty.hidden = showTable;
+    empty.textContent = "";
+    $("count").textContent = loaded && members.length ? "Showing " + rows.length + " of " + members.length : "";
+    if (!showTable) {
+      if (loadError) {
+        empty.append(h("h2", { text: "The directory could not load" }), h("p", { text: loadError }),
+          h("button", { class: "btn", type: "button", text: "Try again", onclick: function () { loadAll(); } }));
+      } else if (!loaded) {
+        empty.append(h("p", { text: "Loading members..." }));
+      } else if (members.length === 0) {
+        empty.append(h("h2", { text: "No members yet" }),
+          h("p", { text: "Add your first member, or import your Excel list, to start the directory." }),
+          h("button", { class: "btn primary", type: "button", text: "Add the first member", onclick: function () { openForm(null); } }));
+      } else {
+        empty.append(h("p", { text: "No members match these filters. Clear the search or choose \"any\" in a filter." }));
+      }
+      return;
+    }
+    rows.forEach(function (m) {
+      var name = h("button", { class: "name-btn", type: "button", onclick: function (ev) { ev.stopPropagation(); openForm(m); } },
+        (m.surname || "") + ", " + (m.firstName || ""),
+        m.nickname ? h("span", { class: "nick", text: "  (" + m.nickname + ")" }) : null);
+      var meta = [];
+      if (m.civil) meta.push(m.civil + (m.children ? ", " + m.children + (Number(m.children) === 1 ? " child" : " children") : ""));
+      else if (m.children) meta.push(m.children + " children");
+      body.append(h("tr", { onclick: function () { openForm(m); } },
+        h("td", { class: "first" }, name, meta.length ? h("div", { class: "sub", text: meta.join(" · ") }) : null,
+          m.email ? h("div", { class: "sub", text: m.email }) : null),
+        h("td", { "data-label": "BS Group", text: plain(m.group) }),
+        h("td", { "data-label": "Auxiliary", text: plain(m.aux) }),
+        h("td", { "data-label": "Role", text: plain(m.role) }),
+        h("td", { "data-label": "Location", text: plain(m.loc) }),
+        h("td", { "data-label": "Mobile", class: "num", text: plain(m.mobile) }),
+        h("td", { "data-label": "CGM" }, yn(m.cgm), m.cgm === "Yes" && m.cgmYear ? h("span", { class: "sub num", text: "  " + m.cgmYear }) : null),
+        h("td", { "data-label": "Baptism" }, yn(m.bap), m.bap === "Yes" && m.bapYear ? h("span", { class: "sub num", text: "  " + m.bapYear }) : null),
+        h("td", { "data-label": "Joined FCC", class: "num", text: plain(m.yearJoined) })));
+    });
+  }
+  function renderAll() { renderStats(); renderFilters(); renderUpcoming(); renderTable(); }
+
+  // ---------- member form ----------
+  var FIELDS = MAP.map(function (p) { return p[0]; });
+  function syncConditional() {
+    $("annivWrap").hidden = $("civil").value !== "Married";
+    $("cgmYearWrap").hidden = $("cgm").value !== "Yes";
+    $("bapYearWrap").hidden = $("bap").value !== "Yes";
+  }
+  function resetDelete() {
+    clearTimeout(delTimer);
+    var b = $("delBtn"); b.textContent = "Delete member"; b.classList.remove("armed");
+  }
+  function openForm(m) {
+    editingId = m ? m.id : null;
+    $("sheetTitle").textContent = m ? "Edit member" : "Add member";
+    $("saveBtn").textContent = m ? "Save changes" : "Save member";
+    $("delBtn").hidden = !m;
+    resetDelete();
+    $("formMsg").textContent = "";
+    FIELDS.forEach(function (f) { $(f).value = m && m[f] != null ? m[f] : ""; });
+    syncConditional();
+    $("overlay").hidden = false;
+    $("surname").focus();
+  }
+  function closeForm() { $("overlay").hidden = true; editingId = null; resetDelete(); }
+  function collect() {
+    var data = {};
+    FIELDS.forEach(function (f) {
+      var raw = $(f).value.trim();
+      if (NUMERIC[f]) data[f] = raw === "" ? null : Number(raw);
+      else data[f] = raw;
+    });
+    if (data.civil !== "Married") data.anniv = "";
+    if (data.cgm !== "Yes") data.cgmYear = null;
+    if (data.bap !== "Yes") data.bapYear = null;
+    return data;
+  }
+  $("form").addEventListener("submit", function (ev) {
+    ev.preventDefault();
+    var msg = $("formMsg"); msg.textContent = "";
+    var data = collect();
+    if (!data.surname || !data.firstName) { msg.textContent = "Enter a surname and a first name."; (data.surname ? $("firstName") : $("surname")).focus(); return; }
+    if (data.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)) { msg.textContent = "The email address does not look right. Check it for typing errors."; $("email").focus(); return; }
+    var btn = $("saveBtn"); btn.disabled = true;
+    var wasEdit = !!editingId;
+    var op = wasEdit
+      ? sb.from("members").update(toRow(data)).eq("id", editingId).select()
+      : sb.from("members").insert(toRow(data)).select();
+    op.then(function (res) {
+      if (res.error) throw res.error;
+      if (!res.data || !res.data.length) throw { message: "Nothing was saved. The member may have been deleted or you may not have permission." };
+      closeForm(); toast(wasEdit ? "Member updated" : "Member added");
+      return loadAll();
+    }).catch(function (e) { msg.textContent = dbMessage(e); })
+      .then(function () { btn.disabled = false; });
+  });
+  $("delBtn").addEventListener("click", function () {
+    var b = $("delBtn");
+    if (!b.classList.contains("armed")) {
+      b.classList.add("armed"); b.textContent = "Click again to delete";
+      clearTimeout(delTimer); delTimer = setTimeout(resetDelete, 4000);
+      return;
+    }
+    if (!editingId) return;
+    b.disabled = true;
+    sb.from("members").delete().eq("id", editingId).select().then(function (res) {
+      if (res.error) throw res.error;
+      if (!res.data || !res.data.length) throw { message: "Nothing was deleted. You may not have permission." };
+      closeForm(); toast("Member deleted");
+      return loadAll();
+    }).catch(function (e) { $("formMsg").textContent = dbMessage(e); })
+      .then(function () { b.disabled = false; });
+  });
+  $("civil").addEventListener("change", syncConditional);
+  $("cgm").addEventListener("change", syncConditional);
+  $("bap").addEventListener("change", syncConditional);
+  $("shareBtn").addEventListener("click", function () {
+    var url = new URL("join.html", location.href).href;
+    function ok() { toast("Form link copied: " + url); }
+    function fallback() { window.prompt("Copy this link and share it with your members:", url); }
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(url).then(ok, fallback); else fallback();
+  });
+  $("addBtn").addEventListener("click", function () { openForm(null); });
+  $("closeBtn").addEventListener("click", closeForm);
+  $("cancelBtn").addEventListener("click", closeForm);
+  $("overlay").addEventListener("mousedown", function (ev) { if (ev.target === $("overlay")) closeForm(); });
+  document.addEventListener("keydown", function (ev) { if (ev.key === "Escape" && !$("overlay").hidden) closeForm(); });
+  ["q", "fGroup", "fAux", "fLoc", "fCgm", "fBap"].forEach(function (id) {
+    $(id).addEventListener(id === "q" ? "input" : "change", renderTable);
+  });
+
+  // ---------- Excel export + template ----------
+  var COLS = [
+    ["Surname", "surname", 18], ["First name", "firstName", 18], ["Nickname", "nickname", 14], ["Birthday", "birthday", 13],
+    ["Civil status", "civil", 14], ["Wedding anniversary", "anniv", 20], ["No. of children", "children", 15],
+    ["Mobile no.", "mobile", 18], ["Email address", "email", 28], ["BS Group", "group", 14], ["Auxiliary", "aux", 16],
+    ["Board/Member", "role", 14], ["Year joined FCC", "yearJoined", 16], ["Location/Emirates", "loc", 20],
+    ["CGM", "cgm", 8], ["CGM year", "cgmYear", 10], ["Baptism", "bap", 10], ["Baptism year", "bapYear", 13]
+  ];
+  function saveSheet(rows, filename) {
+    if (typeof XLSX === "undefined") { toast("The Excel library did not load. Reload the page and try again."); return; }
+    var ws = XLSX.utils.aoa_to_sheet(rows);
+    ws["!cols"] = COLS.map(function (c) { return { wch: c[2] }; });
+    var wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Members");
+    XLSX.writeFile(wb, filename);
+  }
+  var HEADERS = COLS.map(function (c) { return c[0]; });
+  $("exportBtn").addEventListener("click", function () {
+    var list = filtered();
+    if (!list.length) { toast("There are no members to export."); return; }
+    var rows = [HEADERS].concat(list.map(function (m) {
+      return COLS.map(function (c) { var v = m[c[1]]; return v == null ? "" : v; });
+    }));
+    saveSheet(rows, "wifi-group-members.xlsx");
+  });
+
+  // ---------- Excel import ----------
+  var ALIASES = {
+    surname: ["surname", "lastname", "familyname"],
+    firstName: ["firstname", "givenname", "first"],
+    nickname: ["nickname", "nick"],
+    birthday: ["birthday", "birthdate", "dateofbirth", "dob"],
+    civil: ["civilstatus", "maritalstatus"],
+    anniv: ["weddinganniversary", "anniversary"],
+    children: ["noofchildren", "children", "numberofchildren"],
+    mobile: ["mobileno", "mobile", "mobilenumber", "phone", "contactno"],
+    email: ["emailaddress", "email"],
+    group: ["bsgroup", "group", "biblestudygroup"],
+    aux: ["auxiliary"],
+    role: ["boardmember", "boardormember", "role"],
+    yearJoined: ["yearjoinedfcc", "yearjoined"],
+    loc: ["locationemirates", "locationemirate", "location", "emirate", "emirates"],
+    cgm: ["cgm"],
+    cgmYear: ["cgmyear", "yearcgm"],
+    bap: ["baptism", "baptized"],
+    bapYear: ["baptismyear"]
+  };
+  var HEADER_MAP = {};
+  Object.keys(ALIASES).forEach(function (k) { ALIASES[k].forEach(function (a) { HEADER_MAP[a] = k; }); });
+  var CIVIL = ["Single", "Married", "Widowed", "Separated", "Divorced"];
+  var ROLES = ["Board", "Member"];
+  var EMIRATES = ["Abu Dhabi", "Dubai", "Sharjah", "Ajman", "Umm Al Quwain", "Ras Al Khaimah", "Fujairah", "Outside UAE"];
+  var impStep = "pick", impRecords = [], impBusy = false;
+
+  function norm(s) { return String(s == null ? "" : s).toLowerCase().replace(/[^a-z0-9]/g, ""); }
+  function pad(n) { return (n < 10 ? "0" : "") + n; }
+  function ymd(y, m, d) { return (!y || m < 1 || m > 12 || d < 1 || d > 31) ? "" : y + "-" + pad(m) + "-" + pad(d); }
+  function dateOut(v) { return { val: v, bad: !v }; }
+  function toDate(v) {
+    if (v == null || v === "") return { val: "", bad: false };
+    if (v instanceof Date) {
+      if (isNaN(v.getTime())) return { val: "", bad: true };
+      var t = new Date(v.getTime() + 43200000);
+      return dateOut(ymd(t.getFullYear(), t.getMonth() + 1, t.getDate()));
+    }
+    if (typeof v === "number") {
+      var t2 = new Date(Math.round((v - 25569) * 86400000));
+      return dateOut(ymd(t2.getUTCFullYear(), t2.getUTCMonth() + 1, t2.getUTCDate()));
+    }
+    var s = String(v).trim(), m;
+    if ((m = s.match(/^(\d{4})[-\/.](\d{1,2})[-\/.](\d{1,2})$/))) return dateOut(ymd(+m[1], +m[2], +m[3]));
+    if ((m = s.match(/^(\d{1,2})[-\/.](\d{1,2})[-\/.](\d{4})$/))) return dateOut(ymd(+m[3], +m[2], +m[1]));
+    var p = Date.parse(s);
+    if (!isNaN(p)) { var t3 = new Date(p); return dateOut(ymd(t3.getFullYear(), t3.getMonth() + 1, t3.getDate())); }
+    return { val: "", bad: true };
+  }
+  function toText(v) {
+    if (v == null || v instanceof Date) return "";
+    if (typeof v === "number") return Number.isInteger(v) ? String(v) : String(v).trim();
+    return String(v).trim();
+  }
+  function toYesNo(v) {
+    var s = toText(v).toLowerCase();
+    if (["yes", "y", "true", "1"].indexOf(s) >= 0) return "Yes";
+    if (["no", "n", "false", "0"].indexOf(s) >= 0) return "No";
+    return "";
+  }
+  function toInt(v) {
+    var s = toText(v).replace(/[^\d]/g, "");
+    if (!s) return null;
+    var n = parseInt(s, 10);
+    return isNaN(n) ? null : n;
+  }
+  function matchList(v, list) {
+    var s = toText(v);
+    if (!s) return "";
+    var low = s.toLowerCase();
+    for (var i = 0; i < list.length; i++) if (list[i].toLowerCase() === low) return list[i];
+    return s;
+  }
+  function keyOf(m) { return ((m.surname || "") + "|" + (m.firstName || "")).toLowerCase().replace(/\s+/g, " ").trim(); }
+
+  function parseRows(rows) {
+    var out = { error: "", records: [], matched: [], unmatched: [], noName: 0, dups: 0, badDates: 0 };
+    var headerRow = rows.length ? rows[0] : [];
+    var colMap = {};
+    headerRow.forEach(function (cell, i) {
+      var raw = toText(cell);
+      if (!raw) return;
+      var field = HEADER_MAP[norm(raw)];
+      if (field && colMap[i] == null) { colMap[i] = field; out.matched.push(raw); }
+      else out.unmatched.push(raw);
+    });
+    var fields = Object.keys(colMap).map(function (i) { return colMap[i]; });
+    if (fields.indexOf("surname") < 0 && fields.indexOf("firstName") < 0) {
+      out.error = "No Surname or First name column was found in the first row. Make sure row 1 holds the column headings.";
+      return out;
+    }
+    var seen = {};
+    members.forEach(function (m) { seen[keyOf(m)] = true; });
+    for (var r = 1; r < rows.length; r++) {
+      var row = rows[r], rec = {};
+      var any = row.some(function (c) { return toText(c) !== "" || c instanceof Date; });
+      if (!any) continue;
+      Object.keys(colMap).forEach(function (i) {
+        var f = colMap[i], v = row[i];
+        if (f === "birthday" || f === "anniv") { var d = toDate(v); rec[f] = d.val; if (d.bad) out.badDates++; }
+        else if (NUMERIC[f]) rec[f] = toInt(v);
+        else if (f === "cgm" || f === "bap") rec[f] = toYesNo(v);
+        else if (f === "civil") rec[f] = matchList(v, CIVIL);
+        else if (f === "role") rec[f] = matchList(v, ROLES);
+        else if (f === "loc") rec[f] = matchList(v, EMIRATES);
+        else rec[f] = toText(v);
+      });
+      if (!rec.surname && !rec.firstName) { out.noName++; continue; }
+      rec.surname = rec.surname || ""; rec.firstName = rec.firstName || "";
+      var k = keyOf(rec);
+      if (seen[k]) { out.dups++; continue; }
+      seen[k] = true;
+      if (rec.civil !== "Married") rec.anniv = "";
+      if (rec.cgm !== "Yes") rec.cgmYear = null;
+      if (rec.bap !== "Yes") rec.bapYear = null;
+      out.records.push(rec);
+    }
+    return out;
+  }
+
+  function impShow(step) {
+    impStep = step;
+    $("impMsg").textContent = ""; $("impMsg").classList.remove("info");
+    $("tplBtn").hidden = step !== "pick";
+    $("impGo").disabled = false;
+    if (step === "pick") $("impGo").textContent = "Choose file";
+  }
+  function impPick() {
+    var body = $("impBody"); body.textContent = "";
+    body.append(
+      h("p", { text: "Choose an Excel (.xlsx, .xls) or CSV file. Row 1 must hold the column headings, for example Surname, First name, Mobile no. and Birthday." }),
+      h("p", { class: "muted", text: "Columns are matched by heading, so the order does not matter. People already in the directory with the same surname and first name are skipped, so you can safely import the same file twice." }));
+    impShow("pick");
+  }
+  function impReview(res, fileName) {
+    var body = $("impBody"); body.textContent = "";
+    var n = res.records.length;
+    body.append(h("p", {}, h("span", { class: n ? "good" : "", text: n + (n === 1 ? " member" : " members") + " ready to import" }), " from " + fileName + "."));
+    var lines = [];
+    if (res.dups) lines.push(res.dups + " already in the directory (will be skipped)");
+    if (res.noName) lines.push(res.noName + " rows with no name (will be skipped)");
+    if (res.badDates) lines.push(res.badDates + " dates could not be read and will be left blank");
+    if (lines.length) body.append(h("ul", {}, lines.map(function (t) { return h("li", { text: t }); })));
+    if (res.matched.length) body.append(h("p", { class: "muted", text: "Columns used: " + res.matched.join(", ") + "." }));
+    if (res.unmatched.length) body.append(h("p", { class: "muted", text: "Columns not recognised and left out: " + res.unmatched.join(", ") + "." }));
+    if (n) body.append(h("p", { class: "muted", text: "First rows: " + res.records.slice(0, 4).map(fullName).join(", ") + (n > 4 ? ", and more." : ".") }));
+    impRecords = res.records;
+    impShow("review");
+    $("impGo").textContent = n ? "Import " + n + (n === 1 ? " member" : " members") : "Nothing to import";
+    $("impGo").disabled = !n;
+  }
+  function openImport() { impBusy = false; impRecords = []; impPick(); $("impOverlay").hidden = false; $("impGo").focus(); }
+  function closeImport() { if (impBusy) return; $("impOverlay").hidden = true; }
+
+  function handleFile(file) {
+    if (!file) return;
+    if (typeof XLSX === "undefined") { $("impMsg").textContent = "The Excel reader did not load. Reload the page and try again."; return; }
+    var reader = new FileReader();
+    reader.onerror = function () { $("impMsg").textContent = "That file could not be read. Try saving it again as .xlsx or .csv."; };
+    reader.onload = function () {
+      try {
+        var wb = XLSX.read(new Uint8Array(reader.result), { type: "array", cellDates: true, codepage: 65001 });
+        var ws = wb.Sheets[wb.SheetNames[0]];
+        if (!ws) { $("impMsg").textContent = "The file has no sheets."; return; }
+        var rows = XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, defval: "" });
+        var res = parseRows(rows);
+        if (res.error) { impPick(); $("impMsg").textContent = res.error; return; }
+        impReview(res, file.name);
+      } catch (e) {
+        impPick();
+        $("impMsg").textContent = "That file could not be opened. Check that it is a valid .xlsx, .xls or .csv file.";
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  }
+  function runImport() {
+    var list = impRecords.slice(), done = 0, i = 0, failedMsg = "";
+    impBusy = true;
+    $("impGo").disabled = true; $("impCancel").disabled = true; $("impClose").disabled = true;
+    var msg = $("impMsg"); msg.classList.add("info");
+    function progress() { msg.textContent = "Importing " + done + " of " + list.length + "..."; }
+    function next() {
+      if (i >= list.length || failedMsg) return Promise.resolve();
+      var chunk = list.slice(i, i + 100); i += 100;
+      return sb.from("members").insert(chunk.map(toRow)).then(function (res) {
+        if (res.error) { failedMsg = dbMessage(res.error); return; }
+        done += chunk.length; progress();
+        return next();
+      });
+    }
+    progress();
+    next().catch(function (e) { failedMsg = dbMessage(e); }).then(function () {
+      impBusy = false;
+      $("impCancel").disabled = false; $("impClose").disabled = false;
+      return loadAll();
+    }).then(function () {
+      if (failedMsg) {
+        msg.classList.remove("info");
+        msg.textContent = done + " imported, " + (list.length - done) + " not saved. " + failedMsg;
+        $("impGo").textContent = "Done"; $("impGo").disabled = false; impStep = "done";
+      } else {
+        $("impOverlay").hidden = true;
+        toast(done + (done === 1 ? " member imported" : " members imported"));
+      }
+    });
+  }
+  $("importBtn").addEventListener("click", openImport);
+  $("impClose").addEventListener("click", closeImport);
+  $("impCancel").addEventListener("click", closeImport);
+  $("impOverlay").addEventListener("mousedown", function (ev) { if (ev.target === $("impOverlay")) closeImport(); });
+  document.addEventListener("keydown", function (ev) { if (ev.key === "Escape" && !$("impOverlay").hidden) closeImport(); });
+  $("impFile").addEventListener("change", function () { handleFile(this.files && this.files[0]); this.value = ""; });
+  $("impGo").addEventListener("click", function () {
+    if (impStep === "pick") $("impFile").click();
+    else if (impStep === "review") runImport();
+    else closeImport();
+  });
+  $("tplBtn").addEventListener("click", function () { saveSheet([HEADERS], "member-import-template.xlsx"); });
+
+  // ---------- sign in ----------
+  function show(view) {
+    $("authView").hidden = view === "app";
+    $("appView").hidden = view !== "app";
+    $("loginPane").hidden = view === "reset";
+    $("resetPane").hidden = view !== "reset";
+  }
+  function showApp() {
+    show("app");
+    $("whoami").textContent = REQUIRE_LOGIN ? "Signed in as " + ((session && session.user && session.user.email) || "you") + "." : "Member records for the group.";
+    if (!loaded) renderAll();
+    loadAll();
+  }
+  function showLogin() {
+    members = []; loaded = false; loadError = "";
+    $("loginPass").value = "";
+    show("login");
+  }
+
+  $("loginForm").addEventListener("submit", function (ev) {
+    ev.preventDefault();
+    var msg = $("loginMsg"); msg.textContent = ""; msg.classList.remove("info");
+    var email = $("loginEmail").value.trim(), pass = $("loginPass").value;
+    if (!email || !pass) { msg.textContent = "Enter your email and password."; return; }
+    var btn = $("loginBtn"); btn.disabled = true;
+    sb.auth.signInWithPassword({ email: email, password: pass }).then(function (res) {
+      if (res.error) msg.textContent = /invalid/i.test(res.error.message) ? "The email or password is not correct." : "Could not sign in. " + res.error.message;
+    }).catch(function () { msg.textContent = "Could not reach the server. Check your connection and try again."; })
+      .then(function () { btn.disabled = false; });
+  });
+  $("forgotBtn").addEventListener("click", function () {
+    var msg = $("loginMsg"), email = $("loginEmail").value.trim();
+    msg.classList.remove("info");
+    if (!email) { msg.textContent = "Type your email above first, then choose Forgot your password."; $("loginEmail").focus(); return; }
+    sb.auth.resetPasswordForEmail(email, { redirectTo: location.origin + location.pathname }).then(function (res) {
+      if (res.error) { msg.textContent = "Could not send the reset email. " + res.error.message; }
+      else { msg.classList.add("info"); msg.textContent = "If that email has an account, a reset link is on its way."; }
+    });
+  });
+  $("resetForm").addEventListener("submit", function (ev) {
+    ev.preventDefault();
+    var msg = $("resetMsg"); msg.textContent = "";
+    var pass = $("newPass").value;
+    if (pass.length < 8) { msg.textContent = "Use at least 8 characters."; return; }
+    sb.auth.updateUser({ password: pass }).then(function (res) {
+      if (res.error) { msg.textContent = "Could not save the password. " + res.error.message; return; }
+      $("newPass").value = ""; toast("Password updated");
+      if (session) showApp(); else showLogin();
+    });
+  });
+  $("signOutBtn").addEventListener("click", function () { sb.auth.signOut(); });
+
+  // refresh when returning to the tab, so changes from other devices appear
+  document.addEventListener("visibilitychange", function () {
+    if (!document.hidden && session && !$("appView").hidden && $("overlay").hidden && $("impOverlay").hidden) loadAll();
+  });
+
+  // ---------- start ----------
+  function start() {
+    if (!window.supabase || !window.supabase.createClient) {
+      show("login"); $("loginMsg").textContent = "The page could not load its database library. Check your connection and reload."; return;
+    }
+    if (!REQUIRE_LOGIN) {
+      sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { persistSession: false, autoRefreshToken: false } });
+      session = {};
+      $("signOutBtn").hidden = true;
+      showApp();
+      return;
+    }
+    sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    sb.auth.onAuthStateChange(function (event, s) {
+      session = s;
+      if (event === "PASSWORD_RECOVERY") { show("reset"); return; }
+      if (s) { if ($("appView").hidden && $("resetPane").hidden) showApp(); }
+      else showLogin();
+    });
+    sb.auth.getSession().then(function (res) {
+      session = res.data && res.data.session;
+      if (!session) showLogin();
+    });
+  }
+  start();
+})();
+</script>
+</body>
+</html>
