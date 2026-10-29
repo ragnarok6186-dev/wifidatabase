@@ -157,6 +157,16 @@ legend { padding: 0; font-size: .72rem; letter-spacing: .07em; text-transform: u
 .hchg { margin: 0; padding-left: 18px; font-size: .9rem; display: flex; flex-direction: column; gap: 2px; }
 .hchg .old { color: var(--muted); text-decoration: line-through; }
 .hdet { margin: 0; font-size: .88rem; color: var(--muted); overflow-wrap: anywhere; }
+.alist { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 12px; }
+.acard { border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; display: flex; flex-direction: column; gap: 10px; }
+.ahead { display: flex; gap: 8px; flex-wrap: wrap; justify-content: space-between; align-items: baseline; }
+.adate { font-family: var(--font-display); font-size: 1.15rem; font-weight: 600; }
+.aopen { font-size: .78rem; font-weight: 600; color: var(--warn); background: var(--warn-soft); padding: 2px 8px; border-radius: 999px; }
+.adl { display: grid; grid-template-columns: minmax(110px, max-content) minmax(0, 1fr); gap: 4px 14px; margin: 0; }
+.adl dt { color: var(--muted); font-size: .85rem; }
+.adl dd { margin: 0; overflow-wrap: anywhere; }
+.adl dd.open { color: var(--muted); font-style: italic; }
+.abtns { display: flex; gap: 8px; flex-wrap: wrap; }
 .toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: max(20px, env(safe-area-inset-bottom, 0px)); background: var(--ink); color: var(--bg); padding: 10px 16px; border-radius: 999px; z-index: 30; font-size: .9rem; box-shadow: var(--shadow); max-width: calc(100% - 32px); }
 
 @media (max-width: 960px) { .tools { grid-template-columns: repeat(3, minmax(0, 1fr)); } .tools .search { grid-column: 1 / -1; } }
@@ -215,6 +225,7 @@ legend { padding: 0; font-size: .72rem; letter-spacing: .07em; text-transform: u
     <div class="actions">
       <button class="btn" id="importBtn" type="button">Import Excel</button>
       <button class="btn" id="exportBtn" type="button">Export Excel</button>
+      <button class="btn" id="asnBtn" type="button">Saturday assignments</button>
       <button class="btn" id="histBtn" type="button">History</button>
       <button class="btn" id="shareBtn" type="button">Copy form link</button>
       <button class="btn primary" id="addBtn" type="button">Add member</button>
@@ -312,6 +323,59 @@ legend { padding: 0; font-size: .72rem; letter-spacing: .07em; text-transform: u
         <div class="right">
           <button class="btn" type="button" id="cancelBtn">Cancel</button>
           <button class="btn primary" type="submit" id="saveBtn">Save member</button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Saturday assignments: list -->
+<div class="overlay" id="asnOverlay" hidden>
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="asnListTitle">
+    <header>
+      <h2 id="asnListTitle">Bible study assignments</h2>
+      <button class="btn" type="button" id="asnClose">Close</button>
+    </header>
+    <div class="hist">
+      <div class="htools">
+        <button class="btn primary" type="button" id="asnAdd">Add Saturday</button>
+        <select id="asnFilter" aria-label="Show">
+          <option value="upcoming">Upcoming</option><option value="past">Past</option><option value="all">All</option>
+        </select>
+        <button class="btn" type="button" id="asnRefresh">Refresh</button>
+      </div>
+      <p class="muted" id="asnMsg" role="status"></p>
+      <ul class="alist" id="asnList"></ul>
+    </div>
+  </div>
+</div>
+
+<!-- Saturday assignments: editor -->
+<div class="overlay" id="asnEdit" hidden>
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="asnTitle">
+    <header>
+      <h2 id="asnTitle">Add Saturday</h2>
+      <button class="btn" type="button" id="asnEditClose">Close</button>
+    </header>
+    <form id="asnForm" novalidate>
+      <datalist id="namesList"></datalist>
+      <div class="grid">
+        <div class="field"><label for="a_date">Date</label><input id="a_date" type="date" required></div>
+        <div class="field"><label for="a_teacher">Teacher</label><input id="a_teacher" list="namesList" autocomplete="off"></div>
+        <div class="field" style="grid-column:1/-1"><label for="a_topic">Topic</label><input id="a_topic" autocomplete="off"></div>
+        <div class="field"><label for="a_presider">Presider</label><input id="a_presider" list="namesList" autocomplete="off"></div>
+        <div class="field"><label for="a_opening_prayer">Opening &amp; Food Prayer</label><input id="a_opening_prayer" list="namesList" autocomplete="off"></div>
+        <div class="field"><label for="a_pw_lead">Lead for P&amp;W</label><input id="a_pw_lead" list="namesList" autocomplete="off"></div>
+        <div class="field"><label for="a_closing_prayer">Closing Prayer</label><input id="a_closing_prayer" list="namesList" autocomplete="off"></div>
+        <div class="field" style="grid-column:1/-1"><label for="a_food_prep">Food Preparation <span class="opt">(one or more names)</span></label><input id="a_food_prep" list="namesList" autocomplete="off"></div>
+        <div class="field" style="grid-column:1/-1"><label for="a_notes">Notes <span class="opt">(optional)</span></label><input id="a_notes" autocomplete="off"></div>
+      </div>
+      <p class="msg" id="asnFormMsg" role="alert"></p>
+      <div class="foot">
+        <button class="btn danger" type="button" id="asnDel" hidden>Delete Saturday</button>
+        <div class="right">
+          <button class="btn" type="button" id="asnCancel">Cancel</button>
+          <button class="btn primary" type="submit" id="asnSave">Save</button>
         </div>
       </div>
     </form>
@@ -679,6 +743,133 @@ legend { padding: 0; font-size: .72rem; letter-spacing: .07em; text-transform: u
     function fallback() { window.prompt("Copy this link and share it with your members:", url); }
     if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(url).then(ok, fallback); else fallback();
   });
+  // ---------- Saturday bible study assignments ----------
+  var ASN_ROLES = [["teacher", "Teacher"], ["topic", "Topic"], ["presider", "Presider"], ["opening_prayer", "Opening & Food Prayer"],
+    ["pw_lead", "Lead for P&W"], ["closing_prayer", "Closing Prayer"], ["food_prep", "Food Preparation"]];
+  var asn = [], asnEditing = null, asnDelTimer = null;
+  function isoLocal(d) { return d.getFullYear() + "-" + ("0" + (d.getMonth() + 1)).slice(-2) + "-" + ("0" + d.getDate()).slice(-2); }
+  function asnLabel(iso) {
+    var p = parseDate(iso);
+    return p ? new Date(p.y, p.m - 1, p.d).toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "short", year: "numeric" }) : String(iso);
+  }
+  function nextFreeSaturday() {
+    var d = new Date(); d.setHours(0, 0, 0, 0);
+    while (d.getDay() !== 6) d.setDate(d.getDate() + 1);
+    for (var i = 0; i < 104; i++) {
+      var iso = isoLocal(d);
+      if (!asn.some(function (a) { return a.bs_date === iso; })) return iso;
+      d.setDate(d.getDate() + 7);
+    }
+    return isoLocal(d);
+  }
+  function val(a, k) { return String(a[k] || "").trim(); }
+  function asnMessage(a) {
+    var lines = ["Bible Study - " + asnLabel(a.bs_date)];
+    ASN_ROLES.forEach(function (r) { lines.push(r[1] + ": " + (val(a, r[0]) || "TBA")); });
+    if (val(a, "notes")) lines.push("Note: " + val(a, "notes"));
+    return lines.join("\n");
+  }
+  function copyText(text, okMsg) {
+    function fallback() { window.prompt("Copy this message:", text); }
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(function () { toast(okMsg); }, fallback); else fallback();
+  }
+  function renderAsn() {
+    var list = $("asnList"), mode = $("asnFilter").value, today = isoLocal(new Date());
+    list.textContent = "";
+    var rows = asn.filter(function (a) { return mode === "all" || (mode === "upcoming" ? a.bs_date >= today : a.bs_date < today); });
+    rows.sort(function (x, y) { return mode === "past" ? (x.bs_date < y.bs_date ? 1 : -1) : (x.bs_date > y.bs_date ? 1 : -1); });
+    $("asnMsg").textContent = rows.length ? "" : (mode === "upcoming" ? "No upcoming Saturdays yet. Click Add Saturday." : "Nothing to show.");
+    rows.forEach(function (a) {
+      var open = ASN_ROLES.filter(function (r) { return r[0] !== "topic" && !val(a, r[0]); }).length;
+      var head = h("div", { class: "ahead" }, h("span", { class: "adate", text: asnLabel(a.bs_date) }),
+        open ? h("span", { class: "aopen", text: open + (open === 1 ? " role open" : " roles open") }) : null);
+      var dl = h("dl", { class: "adl" });
+      ASN_ROLES.forEach(function (r) {
+        var v = val(a, r[0]);
+        dl.append(h("dt", { text: r[1] }), h("dd", { class: v ? "" : "open", text: v || "Unassigned" }));
+      });
+      var kids = [head, dl];
+      if (val(a, "notes")) kids.push(h("div", { class: "hsrc", text: "Note: " + val(a, "notes") }));
+      kids.push(h("div", { class: "abtns" },
+        h("button", { class: "btn", type: "button", text: "Edit", onclick: function () { openAsn(a); } }),
+        h("button", { class: "btn", type: "button", text: "Copy message", onclick: function () { copyText(asnMessage(a), "Message copied. Paste it in your group chat."); } })));
+      list.append(h.apply(null, ["li", { class: "acard" }].concat(kids)));
+    });
+  }
+  function loadAsn() {
+    $("asnMsg").textContent = "Loading...";
+    sb.from("bs_assignments").select("*").order("bs_date", { ascending: true }).limit(500).then(function (res) {
+      if (res.error) throw res.error;
+      asn = res.data || []; renderAsn();
+    }).catch(function (e) {
+      asn = []; $("asnList").textContent = "";
+      $("asnMsg").textContent = (e && (e.code === "42P01" || e.code === "PGRST205" || /bs_assignments/.test(e.message || "")))
+        ? "Assignments are not set up yet. Run assignments.sql in Supabase, then press Refresh."
+        : "Could not load the assignments. Check your connection and press Refresh.";
+    });
+  }
+  function resetAsnDel() { clearTimeout(asnDelTimer); $("asnDel").classList.remove("armed"); $("asnDel").textContent = "Delete Saturday"; }
+  function openAsn(a) {
+    asnEditing = a || null;
+    $("asnTitle").textContent = a ? "Edit assignments" : "Add Saturday";
+    $("asnFormMsg").textContent = ""; resetAsnDel();
+    var dl = $("namesList"); dl.textContent = "";
+    members.map(fullName).sort().forEach(function (n) { var o = document.createElement("option"); o.value = n; dl.append(o); });
+    $("a_date").value = a ? a.bs_date : nextFreeSaturday();
+    ASN_ROLES.forEach(function (r) { $("a_" + r[0]).value = a ? (a[r[0]] || "") : ""; });
+    $("a_notes").value = a ? (a.notes || "") : "";
+    $("asnDel").hidden = !a;
+    $("asnEdit").hidden = false;
+    $("a_teacher").focus();
+  }
+  function closeAsnEdit() { $("asnEdit").hidden = true; asnEditing = null; resetAsnDel(); }
+  $("asnBtn").addEventListener("click", function () { $("asnOverlay").hidden = false; loadAsn(); });
+  $("asnClose").addEventListener("click", function () { $("asnOverlay").hidden = true; });
+  $("asnRefresh").addEventListener("click", loadAsn);
+  $("asnFilter").addEventListener("change", renderAsn);
+  $("asnAdd").addEventListener("click", function () { openAsn(null); });
+  $("asnEditClose").addEventListener("click", closeAsnEdit);
+  $("asnCancel").addEventListener("click", closeAsnEdit);
+  $("asnOverlay").addEventListener("mousedown", function (ev) { if (ev.target === $("asnOverlay")) $("asnOverlay").hidden = true; });
+  $("asnEdit").addEventListener("mousedown", function (ev) { if (ev.target === $("asnEdit")) closeAsnEdit(); });
+  document.addEventListener("keydown", function (ev) {
+    if (ev.key !== "Escape") return;
+    if (!$("asnEdit").hidden) closeAsnEdit(); else if (!$("asnOverlay").hidden) $("asnOverlay").hidden = true;
+  });
+  $("asnForm").addEventListener("submit", function (ev) {
+    ev.preventDefault();
+    var msg = $("asnFormMsg"); msg.textContent = "";
+    var date = $("a_date").value;
+    if (!date) { msg.textContent = "Please pick the date."; $("a_date").focus(); return; }
+    var clash = asn.some(function (a) { return a.bs_date === date && (!asnEditing || a.id !== asnEditing.id); });
+    if (clash) { msg.textContent = "That Saturday already has assignments. Edit that one instead."; return; }
+    var row = { bs_date: date, notes: $("a_notes").value.trim() || null, updated_at: new Date().toISOString() };
+    ASN_ROLES.forEach(function (r) { row[r[0]] = $("a_" + r[0]).value.trim() || null; });
+    var btn = $("asnSave"); btn.disabled = true; btn.textContent = "Saving...";
+    var q = asnEditing ? sb.from("bs_assignments").update(row).eq("id", asnEditing.id) : sb.from("bs_assignments").insert(row);
+    q.then(function (res) {
+      if (res.error) throw res.error;
+      closeAsnEdit(); toast("Saved."); loadAsn();
+    }).catch(function (e) {
+      msg.textContent = (e && e.code === "23505") ? "That Saturday already has assignments. Edit that one instead."
+        : (e && (e.code === "42P01" || e.code === "PGRST205")) ? "Assignments are not set up yet. Run assignments.sql in Supabase."
+        : "Could not save. Please try again.";
+    }).then(function () { btn.disabled = false; btn.textContent = "Save"; });
+  });
+  $("asnDel").addEventListener("click", function () {
+    if (!asnEditing) return;
+    var b = $("asnDel");
+    if (!b.classList.contains("armed")) {
+      b.classList.add("armed"); b.textContent = "Click again to delete";
+      asnDelTimer = setTimeout(resetAsnDel, 4000); return;
+    }
+    resetAsnDel();
+    sb.from("bs_assignments").delete().eq("id", asnEditing.id).then(function (res) {
+      if (res.error) throw res.error;
+      closeAsnEdit(); toast("Deleted."); loadAsn();
+    }).catch(function () { $("asnFormMsg").textContent = "Could not delete. Please try again."; });
+  });
+
   // ---------- history (added / edited / deleted) ----------
   var HLABEL = { surname: "Surname", first_name: "First name", nickname: "Nickname", birthday: "Birthday", civil_status: "Civil status",
     wedding_anniversary: "Wedding anniversary", children: "No. of children", mobile: "Mobile", email: "Email", bs_group: "BS Group",
