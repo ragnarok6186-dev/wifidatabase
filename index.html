@@ -927,6 +927,18 @@ legend { padding: 0; font-size: .72rem; letter-spacing: .07em; text-transform: u
     if (!date) { msg.textContent = "Please pick the date."; $("a_date").focus(); return; }
     var clash = asn.some(function (a) { return a.bs_date === date && (!asnEditing || a.id !== asnEditing.id); });
     if (clash) { msg.textContent = "That Saturday already has assignments. Edit that one instead."; return; }
+    // One person can only hold one role per activity (Topic is not a person, so it is skipped).
+    var held = {}, dupMsg = "";
+    ASN_ROLES.forEach(function (r) {
+      if (dupMsg || r[0] === "topic") return;
+      splitNames($("a_" + r[0]).value).forEach(function (n) {
+        if (dupMsg) return;
+        var k = n.toLowerCase();
+        if (held[k] && held[k] !== r[1]) { dupMsg = n + " is already assigned as " + held[k] + ". One person can only have one role per activity, so please choose a different name for " + r[1] + "."; $("a_" + r[0]).focus(); }
+        else held[k] = r[1];
+      });
+    });
+    if (dupMsg) { msg.textContent = dupMsg; return; }
     var row = { bs_date: date, notes: $("a_notes").value.trim() || null, lesson: $("a_lesson").value.trim() || null, topic_desc: $("a_topic_desc").value.trim() || null, updated_at: new Date().toISOString() };
     ASN_ROLES.forEach(function (r) { row[r[0]] = $("a_" + r[0]).value.trim() || null; });
     var btn = $("asnSave"); btn.disabled = true; btn.textContent = "Saving...";
