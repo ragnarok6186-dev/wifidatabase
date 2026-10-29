@@ -88,6 +88,9 @@ legend { padding: 0; font-size: .72rem; letter-spacing: .07em; text-transform: u
 .hint { color: var(--muted); font-size: .8rem; }
 .note { margin: 0; padding: 10px 12px; border-radius: 8px; background: var(--good-soft); color: var(--good); font-size: .9rem; }
 .done .verse { font-family: var(--font-display); font-size: 1.15rem; font-style: italic; color: var(--accent); margin: 4px 0; }
+.dup { margin: 8px 0 12px; padding: 12px 14px; border-radius: 8px; background: var(--warn-soft); color: var(--warn); border: 1px solid var(--warn); font-size: .92rem; display: flex; flex-direction: column; gap: 10px; align-items: flex-start; }
+.dup p { margin: 0; color: var(--ink); }
+.btn.alt { background: transparent; color: var(--accent); }
 .linkbtn { all: unset; cursor: pointer; color: var(--accent); }
 @media (max-width: 640px) { .grid { grid-template-columns: minmax(0, 1fr); } }
 
@@ -166,6 +169,10 @@ legend { padding: 0; font-size: .72rem; letter-spacing: .07em; text-transform: u
         </div>
       </fieldset>
       
+      <div class="dup" id="dupBox" role="alert" hidden>
+        <p id="dupText"></p>
+        <button class="btn alt" type="button" id="dupGo">Go to Update my details</button>
+      </div>
       <p class="msg" id="formMsg" role="alert"></p>
       <button class="btn" type="submit" id="saveBtn">Submit</button>
     </form>
@@ -222,7 +229,7 @@ legend { padding: 0; font-size: .72rem; letter-spacing: .07em; text-transform: u
 
   $("form").addEventListener("submit", function (ev) {
     ev.preventDefault();
-    var msg = $("formMsg"); msg.textContent = "";
+    var msg = $("formMsg"); msg.textContent = ""; $("dupBox").hidden = true;
     if ($("website").value) return; // spam trap
     var d = collect();
     if (!d.surname || !d.firstName) { msg.textContent = "Please enter your surname and first name."; (d.surname ? $("firstName") : $("surname")).focus(); return; }
@@ -235,7 +242,11 @@ legend { padding: 0; font-size: .72rem; letter-spacing: .07em; text-transform: u
       op = sb.rpc("member_update", { p_surname: verified.surname, p_first: verified.first, p_birthday: verified.birthday, p_data: toRow(d) })
         .then(function (res) { if (res.error) throw res.error; if (res.data !== true) throw { code: "nomatch" }; });
     } else {
-      op = sb.from("members").insert(toRow(d)).then(function (res) { if (res.error) throw res.error; });
+      // Duplicate check by name only. If the check is not set up yet, carry on and add the member.
+      op = sb.rpc("member_name_exists", { p_surname: d.surname, p_first: d.firstName }).then(function (chk) {
+        if (!chk.error && chk.data === true) throw { code: "duplicate" };
+        return sb.from("members").insert(toRow(d)).then(function (res) { if (res.error) throw res.error; });
+      });
     }
     op.then(function () {
       $("doneTitle").textContent = wasEdit ? "Details updated" : "Welcome to BS-Wifi family";
@@ -245,6 +256,11 @@ legend { padding: 0; font-size: .72rem; letter-spacing: .07em; text-transform: u
       $("formCard").hidden = true; $("doneCard").hidden = false;
       window.scrollTo(0, 0);
     }).catch(function (e) {
+      if (e && e.code === "duplicate") {
+        $("dupText").textContent = (d.firstName + " " + d.surname).trim() + " is already in our records. If you want to change your details, please use Update my details instead.";
+        $("dupBox").hidden = false; $("dupBox").scrollIntoView({ block: "center" });
+        return;
+      }
       msg.textContent = (e && e.code === "nomatch") ? "Your record could not be matched any more. Go back and verify again."
         : wasEdit ? "Sorry, your changes could not be saved. Please try again in a moment."
         : "Sorry, your details could not be submitted. Please try again in a moment.";
@@ -260,12 +276,17 @@ legend { padding: 0; font-size: .72rem; letter-spacing: .07em; text-transform: u
     $("doneCard").hidden = true;
     $("verifyCard").hidden = m !== "edit";
     $("formCard").hidden = m === "edit";
-    $("editNote").hidden = true;
+    $("editNote").hidden = true; $("dupBox").hidden = true;
     $("form").reset(); syncConditional();
     $("formMsg").textContent = ""; $("vMsg").textContent = "";
     $("saveBtn").textContent = m === "edit" ? "Save changes" : "Submit";
     window.scrollTo(0, 0);
   }
+  $("dupGo").addEventListener("click", function () {
+    var sn = $("surname").value.trim(), fn = $("firstName").value.trim();
+    setMode("edit");
+    $("vSurname").value = sn; $("vFirst").value = fn; $("vBirthday").focus();
+  });
   $("tabNew").addEventListener("click", function () { setMode("new"); });
   $("tabEdit").addEventListener("click", function () { setMode("edit"); });
   $("againBtn").addEventListener("click", function () { setMode(mode); });
