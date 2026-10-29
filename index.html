@@ -144,6 +144,7 @@ legend { padding: 0; font-size: .72rem; letter-spacing: .07em; text-transform: u
 .htools { display: flex; gap: 8px; flex-wrap: wrap; }
 .htools select, .htools .hq { border: 1px solid var(--line); background: var(--surface); border-radius: 8px; padding: 9px 10px; min-height: 40px; font: inherit; color: inherit; }
 .htools .hq { flex: 1; min-width: 140px; }
+.hist h3 { margin: 6px 0 0; font-size: .75rem; letter-spacing: .07em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
 .hlist { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
 .hitem { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; display: flex; flex-direction: column; gap: 6px; }
 .hrow { display: flex; gap: 8px; flex-wrap: wrap; align-items: baseline; justify-content: space-between; }
@@ -208,6 +209,18 @@ legend { padding: 0; font-size: .72rem; letter-spacing: .07em; text-transform: u
         <p class="msg" id="loginMsg" role="alert"></p>
         <button class="btn primary" type="submit" id="loginBtn">Sign in</button>
         <button class="linkbtn" type="button" id="forgotBtn">Forgot your password?</button>
+        <button class="linkbtn" type="button" id="regLinkBtn" hidden>New officer? Create your account</button>
+      </form>
+    </div>
+    <div id="registerPane" hidden>
+      <form id="registerForm" novalidate>
+        <p>Choose a username and password. The administrator approves your account before you can sign in.</p>
+        <div class="field"><label for="regUser">Username</label><input id="regUser" type="text" autocomplete="username" autocapitalize="none" maxlength="30" required></div>
+        <div class="field"><label for="regPass">Password <span class="opt">(at least 8 characters)</span></label><input id="regPass" type="password" autocomplete="new-password" minlength="8" required></div>
+        <div class="field"><label for="regPass2">Repeat password</label><input id="regPass2" type="password" autocomplete="new-password" required></div>
+        <p class="msg" id="regMsg" role="alert"></p>
+        <button class="btn primary" type="submit" id="regBtn">Send for approval</button>
+        <button class="linkbtn" type="button" id="regBackBtn">Back to sign in</button>
       </form>
     </div>
     <div id="resetPane" hidden>
@@ -235,6 +248,7 @@ legend { padding: 0; font-size: .72rem; letter-spacing: .07em; text-transform: u
       <button class="btn" id="histBtn" type="button">History</button>
       <button class="btn" id="shareBtn" type="button">Copy form link</button>
       <button class="btn primary" id="addBtn" type="button">Add member</button>
+      <button class="btn" id="officersBtn" type="button" hidden>Officer accounts</button>
       <button class="btn" id="signOutBtn" type="button">Sign out</button>
     </div>
   </div>
@@ -424,6 +438,23 @@ legend { padding: 0; font-size: .72rem; letter-spacing: .07em; text-transform: u
 </div>
 
 <!-- History -->
+<!-- Officer accounts (administrator only) -->
+<div class="overlay" id="offOverlay" hidden>
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="offTitle">
+    <header>
+      <h2 id="offTitle">Officer accounts</h2>
+      <button class="btn" type="button" id="offClose">Close</button>
+    </header>
+    <div class="hist">
+      <p class="muted" id="offMsg" role="status"></p>
+      <h3>Waiting for approval</h3>
+      <ul class="hlist" id="offPending"></ul>
+      <h3>Approved officers</h3>
+      <ul class="hlist" id="offApproved"></ul>
+    </div>
+  </div>
+</div>
+
 <div class="overlay" id="histOverlay" hidden>
   <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="histTitle">
     <header>
@@ -478,8 +509,11 @@ legend { padding: 0; font-size: .72rem; letter-spacing: .07em; text-transform: u
   var REQUIRE_LOGIN = false;
   // Simple admin gate for this page (not Supabase sign-in). Stores a hash, not the password itself.
   var ADMIN_GATE = true;
-  var ADMIN_USER = "benj";
-  var ADMIN_HASH = "d20c332006377a536217f4db2c1661d50c6da684f3a5e4005ec8339c8fd3c195";
+  // The administrator login: username (lowercase) -> SHA-256 of "username:password".
+  // Officers create their own accounts on the sign-in screen and the administrator approves them (see supabase-officers.sql).
+  var ADMIN_USERS = {
+    "benj": "d20c332006377a536217f4db2c1661d50c6da684f3a5e4005ec8339c8fd3c195"
+  };
 
   var $ = function (id) { return document.getElementById(id); };
   var sb = null, session = null;
@@ -1412,15 +1446,28 @@ legend { padding: 0; font-size: .72rem; letter-spacing: .07em; text-transform: u
   function show(view) {
     $("authView").hidden = view === "app";
     $("appView").hidden = view !== "app";
-    $("loginPane").hidden = view === "reset";
+    $("loginPane").hidden = view === "reset" || view === "register";
+    $("registerPane").hidden = view !== "register";
     $("resetPane").hidden = view !== "reset";
   }
   function showApp() {
     show("app");
     $("whoami").textContent = REQUIRE_LOGIN ? "Signed in as " + ((session && session.user && session.user.email) || "you") + "." : "Member records for the group.";
+    var who = getSess("wifiUser");
+    if (ADMIN_GATE && !REQUIRE_LOGIN && who) $("whoami").textContent = "Signed in as " + who + ".";
+    $("officersBtn").hidden = !(ADMIN_GATE && !REQUIRE_LOGIN && getSess("wifiKey"));
+    if (!$("officersBtn").hidden) loadOfficers(true);
     if (!loaded) renderAll();
     loadAll();
   }
+  function setSess(user, key) {
+    try {
+      sessionStorage.setItem("wifiAdmin", "1"); sessionStorage.setItem("wifiUser", user);
+      if (key) sessionStorage.setItem("wifiKey", key); else sessionStorage.removeItem("wifiKey");
+    } catch (e) {}
+  }
+  function clearSess() { try { ["wifiAdmin", "wifiUser", "wifiKey"].forEach(function (k) { sessionStorage.removeItem(k); }); } catch (e) {} }
+  function getSess(k) { try { return sessionStorage.getItem(k) || ""; } catch (e) { return ""; } }
   function sha256Hex(str) {
     return crypto.subtle.digest("SHA-256", new TextEncoder().encode(str)).then(function (buf) {
       return Array.prototype.map.call(new Uint8Array(buf), function (b) { return ("0" + b.toString(16)).slice(-2); }).join("");
@@ -1440,11 +1487,17 @@ legend { padding: 0; font-size: .72rem; letter-spacing: .07em; text-transform: u
     if (ADMIN_GATE && !REQUIRE_LOGIN) {
       var gbtn = $("loginBtn"); gbtn.disabled = true;
       sha256Hex(email.toLowerCase() + ":" + pass).then(function (hex) {
-        if (email.toLowerCase() === ADMIN_USER && hex === ADMIN_HASH) {
-          try { sessionStorage.setItem("wifiAdmin", "1"); } catch (e) {}
-          $("loginPass").value = ""; showApp();
-        } else { msg.textContent = "The username or password is not correct."; }
-      }).catch(function () { msg.textContent = "Could not check the password in this browser."; })
+        var user = email.toLowerCase();
+        if (Object.prototype.hasOwnProperty.call(ADMIN_USERS, user) && ADMIN_USERS[user] === hex) {
+          setSess(user, hex); $("loginPass").value = ""; showApp(); return;
+        }
+        return sb.rpc("officer_login", { p_user: user, p_hash: hex }).then(function (res) {
+          if (res.error) { msg.textContent = officerError(res.error); return; }
+          if (res.data === "approved") { setSess(user, ""); $("loginPass").value = ""; showApp(); }
+          else if (res.data === "pending") { msg.textContent = "Your account is waiting for the administrator's approval."; }
+          else { msg.textContent = "The username or password is not correct."; }
+        });
+      }).catch(function () { msg.textContent = "Could not sign in. Check your connection and try again."; })
         .then(function () { gbtn.disabled = false; });
       return;
     }
@@ -1475,9 +1528,105 @@ legend { padding: 0; font-size: .72rem; letter-spacing: .07em; text-transform: u
     });
   });
   $("signOutBtn").addEventListener("click", function () {
-    if (ADMIN_GATE && !REQUIRE_LOGIN) { try { sessionStorage.removeItem("wifiAdmin"); } catch (e) {} showLogin(); return; }
+    if (ADMIN_GATE && !REQUIRE_LOGIN) { clearSess(); showLogin(); return; }
     sb.auth.signOut();
   });
+
+  // ---------- officer accounts ----------
+  function officerError(e) {
+    var m = (e && e.message) || "";
+    if (/not allowed/i.test(m)) return "Only the administrator can do this. Sign out and sign in as the administrator.";
+    if (/does not exist|schema cache|could not find the function/i.test(m)) return "Officer accounts are not set up yet. Run supabase-officers.sql in Supabase.";
+    return "Could not reach the server. Check your connection and try again.";
+  }
+  $("regLinkBtn").addEventListener("click", function () { $("regMsg").textContent = ""; show("register"); $("regUser").focus(); });
+  $("regBackBtn").addEventListener("click", function () { show("login"); });
+  $("registerForm").addEventListener("submit", function (ev) {
+    ev.preventDefault();
+    var msg = $("regMsg"); msg.textContent = "";
+    var user = $("regUser").value.trim().toLowerCase(), pass = $("regPass").value;
+    if (!/^[a-z0-9._-]{3,30}$/.test(user)) { msg.textContent = "Use 3 to 30 letters, numbers, dots, dashes or underscores for the username. No spaces."; $("regUser").focus(); return; }
+    if (pass.length < 8) { msg.textContent = "Use at least 8 characters for the password."; $("regPass").focus(); return; }
+    if (pass !== $("regPass2").value) { msg.textContent = "The two passwords do not match."; $("regPass2").focus(); return; }
+    var btn = $("regBtn"); btn.disabled = true;
+    sha256Hex(user + ":" + pass).then(function (hex) {
+      return sb.rpc("officer_register", { p_user: user, p_hash: hex });
+    }).then(function (res) {
+      if (res.error) { msg.textContent = officerError(res.error); return; }
+      var r = res.data;
+      if (r === "ok") {
+        $("regPass").value = ""; $("regPass2").value = ""; $("regUser").value = "";
+        show("login"); $("loginEmail").value = user;
+        var lm = $("loginMsg"); lm.classList.add("info");
+        lm.textContent = "Request sent. You can sign in once the administrator approves your account.";
+      }
+      else if (r === "taken") msg.textContent = "That username is already taken. Choose another one.";
+      else if (r === "bad_username") msg.textContent = "Use 3 to 30 letters, numbers, dots, dashes or underscores for the username. No spaces.";
+      else if (r === "busy") msg.textContent = "Too many requests are waiting. Ask the administrator to clear them first.";
+      else msg.textContent = "The request could not be sent. Try again.";
+    }).catch(function () { msg.textContent = "Could not reach the server. Check your connection and try again."; })
+      .then(function () { btn.disabled = false; });
+  });
+
+  var offTimers = {};
+  function offKey() { return getSess("wifiKey"); }
+  function renderOfficers(rows) {
+    var pend = $("offPending"), appr = $("offApproved");
+    pend.textContent = ""; appr.textContent = "";
+    var np = 0;
+    rows.forEach(function (r) {
+      var when = r.created_at ? new Date(r.created_at).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }) : "";
+      if (r.status === "pending") {
+        np++;
+        pend.append(h("li", { class: "hitem" },
+          h("div", { class: "hrow" }, h("span", { class: "hname", text: r.username }), h("span", { class: "hwhen", text: "asked " + when })),
+          h("div", { class: "abtns" },
+            h("button", { class: "btn primary", type: "button", text: "Approve", onclick: function () { decideOfficer(r.username, "approve"); } }),
+            armBtn("Reject", "Click again to reject", function () { decideOfficer(r.username, "reject"); }))));
+      } else {
+        appr.append(h("li", { class: "hitem" },
+          h("div", { class: "hrow" }, h("span", { class: "hname", text: r.username }), h("span", { class: "hwhen", text: "approved" })),
+          h("div", { class: "abtns" }, armBtn("Remove access", "Click again to remove", function () { decideOfficer(r.username, "remove"); }))));
+      }
+    });
+    if (!pend.children.length) pend.append(h("li", { class: "muted", text: "Nobody is waiting." }));
+    if (!appr.children.length) appr.append(h("li", { class: "muted", text: "No officers yet. Send them the sign-in page and ask them to create an account." }));
+    $("officersBtn").textContent = np ? "Officer accounts (" + np + ")" : "Officer accounts";
+  }
+  function armBtn(label, armedLabel, go) {
+    var b = h("button", { class: "btn danger", type: "button", text: label });
+    b.addEventListener("click", function () {
+      if (!b.classList.contains("armed")) {
+        b.classList.add("armed"); b.textContent = armedLabel;
+        setTimeout(function () { b.classList.remove("armed"); b.textContent = label; }, 4000);
+        return;
+      }
+      b.disabled = true; go();
+    });
+    return b;
+  }
+  function loadOfficers(quiet) {
+    var key = offKey();
+    if (!key || !sb) return Promise.resolve();
+    if (!quiet) $("offMsg").textContent = "Loading...";
+    return sb.rpc("officer_list", { p_admin_hash: key }).then(function (res) {
+      if (res.error) throw res.error;
+      $("offMsg").textContent = "";
+      renderOfficers(res.data || []);
+    }).catch(function (e) { if (!quiet) $("offMsg").textContent = officerError(e); });
+  }
+  function decideOfficer(user, action) {
+    $("offMsg").textContent = "";
+    sb.rpc("officer_decide", { p_admin_hash: offKey(), p_user: user, p_action: action }).then(function (res) {
+      if (res.error) throw res.error;
+      toast(action === "approve" ? user + " approved" : action === "reject" ? "Request rejected" : "Access removed for " + user);
+      return loadOfficers();
+    }).catch(function (e) { $("offMsg").textContent = officerError(e); loadOfficers(true); });
+  }
+  $("officersBtn").addEventListener("click", function () { $("offOverlay").hidden = false; loadOfficers(); });
+  $("offClose").addEventListener("click", function () { $("offOverlay").hidden = true; });
+  $("offOverlay").addEventListener("mousedown", function (ev) { if (ev.target === $("offOverlay")) $("offOverlay").hidden = true; });
+  document.addEventListener("keydown", function (ev) { if (ev.key === "Escape" && !$("offOverlay").hidden) $("offOverlay").hidden = true; });
 
   // refresh when returning to the tab, so changes from other devices appear
   document.addEventListener("visibilitychange", function () {
@@ -1494,6 +1643,7 @@ legend { padding: 0; font-size: .72rem; letter-spacing: .07em; text-transform: u
       session = {};
       if (ADMIN_GATE) {
         $("forgotBtn").hidden = true;
+        $("regLinkBtn").hidden = false;
         var ok = false; try { ok = sessionStorage.getItem("wifiAdmin") === "1"; } catch (e) {}
         if (ok) showApp(); else showLogin();
         return;
