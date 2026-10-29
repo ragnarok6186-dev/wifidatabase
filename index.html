@@ -395,7 +395,7 @@ legend { padding: 0; font-size: .72rem; letter-spacing: .07em; text-transform: u
         <div class="field"><label for="a_pw_lead">Lead for P&amp;W</label><input id="a_pw_lead" list="namesList" autocomplete="off"></div>
         <div class="field"><label for="a_closing_prayer">Closing Prayer</label><input id="a_closing_prayer" list="namesList" autocomplete="off"></div>
         <div class="field" style="grid-column:1/-1"><label for="a_food_prep">Food Preparation <span class="opt">(one or more names)</span></label><input id="a_food_prep" list="namesList" autocomplete="off"></div>
-        <div class="field" style="grid-column:1/-1"><label for="a_cleaners">Cleaners <span class="opt">(one or more names)</span></label><input id="a_cleaners" list="namesList" autocomplete="off"></div>
+        <div class="field" style="grid-column:1/-1"><label for="a_cleaners">Cleaners <span class="opt">(2 to 3 names)</span></label><input id="a_cleaners" list="namesList" autocomplete="off"></div>
         <div class="field" style="grid-column:1/-1"><label for="a_notes">Notes <span class="opt">(optional)</span></label><input id="a_notes" autocomplete="off"></div>
       </div>
       <p class="msg" id="asnFormMsg" role="alert"></p>
@@ -945,6 +945,8 @@ legend { padding: 0; font-size: .72rem; letter-spacing: .07em; text-transform: u
       });
     });
     if (dupMsg) { msg.textContent = dupMsg; return; }
+    var nCl = splitNames($("a_cleaners").value).length;
+    if (nCl > 3) { msg.textContent = "Cleaners can have up to 3 names. You entered " + nCl + ". Please remove " + (nCl - 3) + "."; $("a_cleaners").focus(); return; }
     var row = { bs_date: date, notes: $("a_notes").value.trim() || null, lesson: $("a_lesson").value.trim() || null, topic_desc: $("a_topic_desc").value.trim() || null, updated_at: new Date().toISOString() };
     ASN_ROLES.forEach(function (r) { row[r[0]] = $("a_" + r[0]).value.trim() || null; });
     var btn = $("asnSave"); btn.disabled = true; btn.textContent = "Saving...";
