@@ -344,7 +344,7 @@ legend { padding: 0; font-size: .72rem; letter-spacing: .07em; text-transform: u
     </header>
     <div class="hist">
       <div class="htools">
-        <button class="btn primary" type="button" id="asnAdd">Add Saturday</button>
+        <button class="btn primary" type="button" id="asnAdd">Add activity</button>
         <button class="btn" type="button" id="asnShare">Share schedule (image)</button>
         <select id="asnFilter" aria-label="Show">
           <option value="upcoming">Upcoming</option><option value="past">Past</option><option value="all">All</option>
@@ -361,7 +361,7 @@ legend { padding: 0; font-size: .72rem; letter-spacing: .07em; text-transform: u
 <div class="overlay" id="asnEdit" hidden>
   <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="asnTitle">
     <header>
-      <h2 id="asnTitle">Add Saturday</h2>
+      <h2 id="asnTitle">Add activity</h2>
       <button class="btn" type="button" id="asnEditClose">Close</button>
     </header>
     <form id="asnForm" novalidate>
@@ -381,7 +381,7 @@ legend { padding: 0; font-size: .72rem; letter-spacing: .07em; text-transform: u
       </div>
       <p class="msg" id="asnFormMsg" role="alert"></p>
       <div class="foot">
-        <button class="btn danger" type="button" id="asnDel" hidden>Delete Saturday</button>
+        <button class="btn danger" type="button" id="asnDel" hidden>Delete activity</button>
         <div class="right">
           <button class="btn" type="button" id="asnCancel">Cancel</button>
           <button class="btn primary" type="submit" id="asnSave">Save</button>
@@ -823,7 +823,7 @@ legend { padding: 0; font-size: .72rem; letter-spacing: .07em; text-transform: u
     list.textContent = "";
     var rows = asn.filter(function (a) { return mode === "all" || (mode === "upcoming" ? a.bs_date >= today : a.bs_date < today); });
     rows.sort(function (x, y) { return mode === "past" ? (x.bs_date < y.bs_date ? 1 : -1) : (x.bs_date > y.bs_date ? 1 : -1); });
-    $("asnMsg").textContent = rows.length ? "" : (mode === "upcoming" ? "No upcoming Saturdays yet. Click Add Saturday." : "Nothing to show.");
+    $("asnMsg").textContent = rows.length ? "" : (mode === "upcoming" ? "No upcoming Saturdays yet. Click Add activity." : "Nothing to show.");
     rows.forEach(function (a) {
       var open = ASN_ROLES.filter(function (r) { return r[0] !== "topic" && !val(a, r[0]); }).length;
       var head = h("div", { class: "ahead" }, h("span", { class: "adate", text: (val(a, "lesson") ? val(a, "lesson") + " \u00b7 " : "") + asnLabel(a.bs_date) }),
@@ -853,10 +853,10 @@ legend { padding: 0; font-size: .72rem; letter-spacing: .07em; text-transform: u
         : "Could not load the assignments. Check your connection and press Refresh.";
     });
   }
-  function resetAsnDel() { clearTimeout(asnDelTimer); $("asnDel").classList.remove("armed"); $("asnDel").textContent = "Delete Saturday"; }
+  function resetAsnDel() { clearTimeout(asnDelTimer); $("asnDel").classList.remove("armed"); $("asnDel").textContent = "Delete activity"; }
   function openAsn(a) {
     asnEditing = a || null;
-    $("asnTitle").textContent = a ? "Edit assignments" : "Add Saturday";
+    $("asnTitle").textContent = a ? "Edit assignments" : "Add activity";
     $("asnFormMsg").textContent = ""; resetAsnDel();
     var dl = $("namesList"); dl.textContent = "";
     members.map(fullName).sort().forEach(function (n) { var o = document.createElement("option"); o.value = n; dl.append(o); });
