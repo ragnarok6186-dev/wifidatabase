@@ -139,6 +139,24 @@ legend { padding: 0; font-size: .72rem; letter-spacing: .07em; text-transform: u
 .imp ul { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 4px; }
 .imp .muted { color: var(--muted); font-size: .9rem; }
 .imp .good { color: var(--good); font-weight: 600; }
+.hist { padding: 16px 20px 20px; display: flex; flex-direction: column; gap: 12px; }
+.hist .muted { margin: 0; color: var(--muted); font-size: .9rem; }
+.htools { display: flex; gap: 8px; flex-wrap: wrap; }
+.htools select, .htools .hq { border: 1px solid var(--line); background: var(--surface); border-radius: 8px; padding: 9px 10px; min-height: 40px; font: inherit; color: inherit; }
+.htools .hq { flex: 1; min-width: 140px; }
+.hlist { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.hitem { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; display: flex; flex-direction: column; gap: 6px; }
+.hrow { display: flex; gap: 8px; flex-wrap: wrap; align-items: baseline; justify-content: space-between; }
+.hname { font-weight: 600; }
+.hwhen { color: var(--muted); font-size: .82rem; }
+.hbadge { font-size: .72rem; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; padding: 2px 8px; border-radius: 999px; margin-right: 6px; }
+.hbadge.added { background: var(--good-soft); color: var(--good); }
+.hbadge.updated { background: var(--accent-soft); color: var(--accent); }
+.hbadge.deleted { background: var(--warn-soft); color: var(--warn); }
+.hsrc { color: var(--muted); font-size: .82rem; }
+.hchg { margin: 0; padding-left: 18px; font-size: .9rem; display: flex; flex-direction: column; gap: 2px; }
+.hchg .old { color: var(--muted); text-decoration: line-through; }
+.hdet { margin: 0; font-size: .88rem; color: var(--muted); overflow-wrap: anywhere; }
 .toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: max(20px, env(safe-area-inset-bottom, 0px)); background: var(--ink); color: var(--bg); padding: 10px 16px; border-radius: 999px; z-index: 30; font-size: .9rem; box-shadow: var(--shadow); max-width: calc(100% - 32px); }
 
 @media (max-width: 960px) { .tools { grid-template-columns: repeat(3, minmax(0, 1fr)); } .tools .search { grid-column: 1 / -1; } }
@@ -197,6 +215,7 @@ legend { padding: 0; font-size: .72rem; letter-spacing: .07em; text-transform: u
     <div class="actions">
       <button class="btn" id="importBtn" type="button">Import Excel</button>
       <button class="btn" id="exportBtn" type="button">Export Excel</button>
+      <button class="btn" id="histBtn" type="button">History</button>
       <button class="btn" id="shareBtn" type="button">Copy form link</button>
       <button class="btn primary" id="addBtn" type="button">Add member</button>
       <button class="btn" id="signOutBtn" type="button">Sign out</button>
@@ -296,6 +315,27 @@ legend { padding: 0; font-size: .72rem; letter-spacing: .07em; text-transform: u
         </div>
       </div>
     </form>
+  </div>
+</div>
+
+<!-- History -->
+<div class="overlay" id="histOverlay" hidden>
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="histTitle">
+    <header>
+      <h2 id="histTitle">Edit and added history</h2>
+      <button class="btn" type="button" id="histClose">Close</button>
+    </header>
+    <div class="hist">
+      <div class="htools">
+        <select id="histFilter" aria-label="Filter history">
+          <option value="">All activity</option><option value="added">Added members</option><option value="updated">Edits</option><option value="deleted">Deleted</option>
+        </select>
+        <input class="hq" id="histQ" type="search" placeholder="Search a name" aria-label="Search history by name">
+        <button class="btn" type="button" id="histRefresh">Refresh</button>
+      </div>
+      <p class="muted" id="histMsg" role="status"></p>
+      <ul class="hlist" id="histList"></ul>
+    </div>
   </div>
 </div>
 
@@ -639,6 +679,74 @@ legend { padding: 0; font-size: .72rem; letter-spacing: .07em; text-transform: u
     function fallback() { window.prompt("Copy this link and share it with your members:", url); }
     if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(url).then(ok, fallback); else fallback();
   });
+  // ---------- history (added / edited / deleted) ----------
+  var HLABEL = { surname: "Surname", first_name: "First name", nickname: "Nickname", birthday: "Birthday", civil_status: "Civil status",
+    wedding_anniversary: "Wedding anniversary", children: "No. of children", mobile: "Mobile", email: "Email", bs_group: "BS Group",
+    auxiliary: "Auxiliary", role: "Board / Member", year_joined: "Year joined", location: "Location", cgm: "CGM", cgm_year: "CGM year",
+    baptism: "Baptism", baptism_year: "Baptism year" };
+  var histRows = [];
+  function hval(v) {
+    if (v === null || v === undefined || v === "") return "(empty)";
+    v = String(v);
+    if (/^\d{4}-\d{2}-\d{2}$/.test(v)) { var p = parseDate(v); return new Date(p.y, p.m - 1, p.d).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }); }
+    return v;
+  }
+  function renderHistory() {
+    var list = $("histList"), f = $("histFilter").value, q = $("histQ").value.trim().toLowerCase();
+    list.textContent = "";
+    var rows = histRows.filter(function (r) {
+      return (!f || r.action === f) && (!q || String(r.member_name || "").toLowerCase().indexOf(q) !== -1);
+    });
+    $("histMsg").textContent = rows.length ? rows.length + (rows.length === 1 ? " entry" : " entries") + (histRows.length >= 300 ? " (showing the latest 300)" : "") : "Nothing to show yet.";
+    rows.forEach(function (r) {
+      var li = document.createElement("li"); li.className = "hitem";
+      var top = document.createElement("div"); top.className = "hrow";
+      var left = document.createElement("div");
+      var badge = document.createElement("span"); badge.className = "hbadge " + r.action; badge.textContent = r.action === "added" ? "Added" : r.action === "updated" ? "Edited" : "Deleted";
+      var nm = document.createElement("span"); nm.className = "hname"; nm.textContent = r.member_name || "Unnamed";
+      left.append(badge, nm);
+      var when = document.createElement("span"); when.className = "hwhen";
+      when.textContent = new Date(r.changed_at).toLocaleString("en-GB", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
+      top.append(left, when); li.append(top);
+      var src = document.createElement("div"); src.className = "hsrc"; src.textContent = "By: " + (r.source || "Admin"); li.append(src);
+      var ch = r.changes || {};
+      if (r.action === "updated") {
+        var ul = document.createElement("ul"); ul.className = "hchg";
+        Object.keys(ch).forEach(function (k) {
+          var item = document.createElement("li");
+          var lab = document.createElement("strong"); lab.textContent = (HLABEL[k] || k) + ": ";
+          var o = document.createElement("span"); o.className = "old"; o.textContent = hval(ch[k] && ch[k].old);
+          var n = document.createElement("span"); n.textContent = " \u2192 " + hval(ch[k] && ch[k].new);
+          item.append(lab, o, n); ul.append(item);
+        });
+        li.append(ul);
+      } else {
+        var bits = Object.keys(ch).map(function (k) { return (HLABEL[k] || k) + ": " + hval(ch[k]); });
+        if (bits.length) { var det = document.createElement("p"); det.className = "hdet"; det.textContent = bits.join(" \u00b7 "); li.append(det); }
+      }
+      list.append(li);
+    });
+  }
+  function loadHistory() {
+    $("histMsg").textContent = "Loading...";
+    sb.from("member_history").select("*").order("changed_at", { ascending: false }).limit(300).then(function (res) {
+      if (res.error) throw res.error;
+      histRows = res.data || []; renderHistory();
+    }).catch(function (e) {
+      histRows = []; $("histList").textContent = "";
+      $("histMsg").textContent = (e && (e.code === "42P01" || e.code === "PGRST205" || /member_history/.test(e.message || "")))
+        ? "History is not set up yet. Run history-log.sql in Supabase, then press Refresh."
+        : "Could not load the history. Check your connection and press Refresh.";
+    });
+  }
+  $("histBtn").addEventListener("click", function () { $("histOverlay").hidden = false; loadHistory(); });
+  $("histClose").addEventListener("click", function () { $("histOverlay").hidden = true; });
+  $("histRefresh").addEventListener("click", loadHistory);
+  $("histFilter").addEventListener("change", renderHistory);
+  $("histQ").addEventListener("input", renderHistory);
+  $("histOverlay").addEventListener("mousedown", function (ev) { if (ev.target === $("histOverlay")) $("histOverlay").hidden = true; });
+  document.addEventListener("keydown", function (ev) { if (ev.key === "Escape" && !$("histOverlay").hidden) $("histOverlay").hidden = true; });
+
   $("addBtn").addEventListener("click", function () { openForm(null); });
   $("closeBtn").addEventListener("click", closeForm);
   $("cancelBtn").addEventListener("click", closeForm);
