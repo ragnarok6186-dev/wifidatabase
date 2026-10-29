@@ -245,7 +245,13 @@ legend { padding: 0; font-size: .72rem; letter-spacing: .07em; text-transform: u
       // Duplicate check by name only. If the check is not set up yet, carry on and add the member.
       op = sb.rpc("member_name_exists", { p_surname: d.surname, p_first: d.firstName }).then(function (chk) {
         if (!chk.error && chk.data === true) throw { code: "duplicate" };
-        return sb.from("members").insert(toRow(d)).then(function (res) { if (res.error) throw res.error; });
+        var row = toRow(d); row.added_via = "Member form";
+        return sb.from("members").insert(row).then(function (res) {
+          if (res.error && (res.error.code === "PGRST204" || res.error.code === "42703")) {   // history not set up yet: add without the label
+            return sb.from("members").insert(toRow(d)).then(function (r2) { if (r2.error) throw r2.error; });
+          }
+          if (res.error) throw res.error;
+        });
       });
     }
     op.then(function () {
