@@ -930,11 +930,16 @@ legend { padding: 0; font-size: .72rem; letter-spacing: .07em; text-transform: u
     var row = { bs_date: date, notes: $("a_notes").value.trim() || null, lesson: $("a_lesson").value.trim() || null, topic_desc: $("a_topic_desc").value.trim() || null, updated_at: new Date().toISOString() };
     ASN_ROLES.forEach(function (r) { row[r[0]] = $("a_" + r[0]).value.trim() || null; });
     var btn = $("asnSave"); btn.disabled = true; btn.textContent = "Saving...";
-    var q = asnEditing ? sb.from("bs_assignments").update(row).eq("id", asnEditing.id) : sb.from("bs_assignments").insert(row);
-    q.then(function (res) {
+    // The database records role changes itself (see role-history.sql). These two fields tell it who made this change.
+    var rowA = Object.assign({}, row, { last_actor: getSess("wifiUser") || "Admin", last_actor_at: new Date().toISOString() });
+    var editId = prev ? prev.id : null;
+    function write(r) { return editId ? sb.from("bs_assignments").update(r).eq("id", editId) : sb.from("bs_assignments").insert(r); }
+    write(rowA).then(function (res) {
+      if (res.error && /last_actor/i.test(res.error.message || "")) return write(row);   // role-history.sql not run yet: save without the extra fields
+      return res;
+    }).then(function (res) {
       if (res.error) throw res.error;
       closeAsnEdit(); toast("Saved."); loadAsn();
-      return logRoles(prev, row);
     }).catch(function (e) {
       msg.textContent = (e && e.code === "23505") ? "That Saturday already has assignments. Edit that one instead."
         : (e && (e.code === "PGRST204" || e.code === "42703")) ? "Please run assignments-update.sql in Supabase first (it adds the Lesson and Topic description fields)."
