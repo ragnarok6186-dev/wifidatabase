@@ -91,6 +91,17 @@ legend { padding: 0; font-size: .72rem; letter-spacing: .07em; text-transform: u
 .dup { margin: 8px 0 12px; padding: 12px 14px; border-radius: 8px; background: var(--warn-soft); color: var(--warn); border: 1px solid var(--warn); font-size: .92rem; display: flex; flex-direction: column; gap: 10px; align-items: flex-start; }
 .dup p { margin: 0; color: var(--ink); }
 .btn.alt { background: transparent; color: var(--accent); }
+.rcard { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; box-shadow: var(--shadow); padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; }
+.rdate { font-family: var(--font-display); font-size: 1.25rem; font-weight: 600; }
+.rsub { color: var(--muted); font-size: .9rem; margin-top: -6px; }
+.rrow { display: grid; grid-template-columns: minmax(120px, max-content) minmax(0, 1fr) auto; gap: 6px 12px; align-items: center; padding-top: 8px; border-top: 1px solid var(--line); }
+.rrow .rl { color: var(--muted); font-size: .85rem; }
+.rrow .rv { overflow-wrap: anywhere; }
+.rrow .rv.open { color: var(--muted); font-style: italic; }
+.rrow .rv.me { color: var(--good); font-weight: 600; }
+.btn.sm { min-height: 38px; padding: 6px 14px; font-size: .9rem; }
+.btn.ghost { background: transparent; color: var(--accent); }
+@media (max-width: 520px) { .rrow { grid-template-columns: minmax(0, 1fr) auto; } .rrow .rl { grid-column: 1 / -1; } }
 .linkbtn { all: unset; cursor: pointer; color: var(--accent); }
 @media (max-width: 640px) { .grid { grid-template-columns: minmax(0, 1fr); } }
 
@@ -100,12 +111,13 @@ legend { padding: 0; font-size: .72rem; letter-spacing: .07em; text-transform: u
 <div class="wrap">
   <div>
     <h1>Member Information Form</h1>
-    <p class="intro">Please fill in your details. Only your surname and first name are required; everything else is optional.</p>
+    <p class="intro" id="intro">Please fill in your details. Only your surname and first name are required; everything else is optional.</p>
   </div>
 
   <div class="tabs" role="tablist">
     <button class="tab active" id="tabNew" type="button" role="tab" aria-selected="true">New member</button>
     <button class="tab" id="tabEdit" type="button" role="tab" aria-selected="false">Update my details</button>
+    <button class="tab" id="tabRoles" type="button" role="tab" aria-selected="false">Assignments</button>
   </div>
 
   <div class="sheet" id="verifyCard" hidden>
@@ -119,6 +131,28 @@ legend { padding: 0; font-size: .72rem; letter-spacing: .07em; text-transform: u
       <p class="msg" id="vMsg" role="alert"></p>
       <button class="btn" type="submit" id="vBtn">Find my record</button>
     </form>
+  </div>
+
+  <div class="sheet" id="rvCard" hidden>
+    <form class="vform" id="rvForm" novalidate>
+      <p class="intro" style="margin:0">Enter your name as it is in our records to see the schedule and choose the roles you want to take.</p>
+      <div class="grid">
+        <div class="field"><label for="rvSurname">Surname</label><input id="rvSurname" autocomplete="off" required></div>
+        <div class="field"><label for="rvFirst">First name</label><input id="rvFirst" autocomplete="off" required></div>
+      </div>
+      <p class="msg" id="rvMsg" role="alert"></p>
+      <button class="btn" type="submit" id="rvBtn">Show the schedule</button>
+    </form>
+  </div>
+
+  <div id="rlWrap" hidden>
+    <div class="sheet" style="display:flex;flex-direction:column;gap:6px;padding-top:16px">
+      <p class="note" id="rlHello" style="margin:0"></p>
+      <p class="hint" style="margin:0">Tap <b>Sign up</b> on any open role. You can remove yourself later if your plans change. The Teacher is set by the admin.</p>
+      <p class="msg" id="rlMsg" role="status" style="color:var(--ink)"></p>
+      <button class="linkbtn" type="button" id="rlSwitch" style="align-self:flex-start">Not you? Use a different name</button>
+    </div>
+    <div id="rlList" style="display:flex;flex-direction:column;gap:12px;margin-top:20px"></div>
   </div>
 
   <div class="sheet" id="formCard">
@@ -274,20 +308,103 @@ legend { padding: 0; font-size: .72rem; letter-spacing: .07em; text-transform: u
   });
 
   // ---------- new member / update my details ----------
-  var mode = "new", verified = null;
+  var mode = "new", verified = null, rolesWho = null;
   function setMode(m) {
-    mode = m; verified = null;
-    $("tabNew").classList.toggle("active", m === "new"); $("tabNew").setAttribute("aria-selected", m === "new");
-    $("tabEdit").classList.toggle("active", m === "edit"); $("tabEdit").setAttribute("aria-selected", m === "edit");
+    mode = m; verified = null; rolesWho = null;
+    ["New", "Edit", "Roles"].forEach(function (n) {
+      var on = (n === "New" && m === "new") || (n === "Edit" && m === "edit") || (n === "Roles" && m === "roles");
+      $("tab" + n).classList.toggle("active", on); $("tab" + n).setAttribute("aria-selected", on);
+    });
     $("doneCard").hidden = true;
+    $("intro").hidden = m !== "new";
     $("verifyCard").hidden = m !== "edit";
-    $("formCard").hidden = m === "edit";
+    $("formCard").hidden = m !== "new";
+    $("rvCard").hidden = m !== "roles";
+    $("rlWrap").hidden = true;
     $("editNote").hidden = true; $("dupBox").hidden = true;
     $("form").reset(); syncConditional();
-    $("formMsg").textContent = ""; $("vMsg").textContent = "";
+    $("formMsg").textContent = ""; $("vMsg").textContent = ""; $("rvMsg").textContent = "";
     $("saveBtn").textContent = m === "edit" ? "Save changes" : "Submit";
     window.scrollTo(0, 0);
   }
+  // ---------- choose assignments ----------
+  var ROLE_ROWS = [["teacher", "Teacher", false], ["presider", "Presider", true], ["opening_prayer", "Opening & Food Prayer", true],
+    ["pw_lead", "Lead for P&W", true], ["closing_prayer", "Closing Prayer", true], ["food_prep", "Food Preparation", true]];
+  function mk(tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
+  function dateLabel(iso) {
+    var p = String(iso).split("-").map(Number);
+    return new Date(p[0], p[1] - 1, p[2]).toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+  }
+  function rolesError(e) {
+    var m = (e && e.message) || "";
+    return (e && (e.code === "PGRST202" || e.code === "42883" || /function/i.test(m)))
+      ? "Choosing assignments is not switched on yet. Please contact the group admin."
+      : "Sorry, something went wrong. Please try again in a moment.";
+  }
+  function renderRoles(data) {
+    var box = $("rlList"); box.textContent = "";
+    var me = String(data.name || "").toLowerCase();
+    $("rlHello").textContent = "Hi " + data.name + "! Here is the upcoming schedule.";
+    if (!data.items.length) { box.append(mk("p", "intro", "There are no upcoming activities yet. Please check again later.")); return; }
+    data.items.forEach(function (a) {
+      var card = mk("div", "rcard");
+      card.append(mk("div", "rdate", dateLabel(a.bs_date)));
+      var sub = [a.lesson, a.topic ? a.topic + (a.topic_desc ? " (" + a.topic_desc + ")" : "") : ""].filter(Boolean).join(" \u2014 ");
+      if (sub) card.append(mk("div", "rsub", sub));
+      ROLE_ROWS.forEach(function (r) {
+        var v = String(a[r[0]] || "").trim(), names = v ? v.split(" & ").map(function (x) { return x.trim(); }) : [];
+        var mine = names.some(function (x) { return x.toLowerCase() === me; });
+        var row = mk("div", "rrow");
+        row.append(mk("span", "rl", r[1]));
+        row.append(mk("span", "rv" + (!v ? " open" : mine ? " me" : ""), v ? (mine && names.length === 1 ? "You" : v) : (r[2] ? "Open" : "To be assigned")));
+        var act = mk("span");
+        if (r[2]) {
+          var canJoin = !mine && (!v || (r[0] === "food_prep" && names.length < 3));
+          if (mine) { var rel = mk("button", "btn sm ghost", "Remove me"); rel.type = "button"; rel.addEventListener("click", function () { claim(a.id, r[0], true, rel); }); act.append(rel); }
+          else if (canJoin) { var go = mk("button", "btn sm", v ? "Join" : "Sign up"); go.type = "button"; go.addEventListener("click", function () { claim(a.id, r[0], false, go); }); act.append(go); }
+        }
+        row.append(act); card.append(row);
+      });
+      box.append(card);
+    });
+  }
+  function loadRoles(keepMsg) {
+    return sb.rpc("assignment_list", { p_surname: rolesWho.surname, p_first: rolesWho.first }).then(function (res) {
+      if (res.error) throw res.error;
+      if (!res.data) { $("rlWrap").hidden = true; $("rvCard").hidden = false; $("rvMsg").textContent = "We could not find that name in our records. Check the spelling, or use the New member tab."; rolesWho = null; return; }
+      if (!keepMsg) $("rlMsg").textContent = "";
+      renderRoles(res.data);
+    });
+  }
+  function claim(id, role, release, btn) {
+    btn.disabled = true;
+    sb.rpc("assignment_claim", { p_surname: rolesWho.surname, p_first: rolesWho.first, p_id: id, p_role: role, p_release: release }).then(function (res) {
+      if (res.error) throw res.error;
+      var t = res.data, msgs = {
+        ok: release ? "Done. You have been removed from that role." : "Thank you! You are signed up.",
+        already: "You already have that role.", taken: "Sorry, that role was just taken by someone else.",
+        not_yours: "That role is not under your name.", gone: "That activity is no longer available.",
+        not_member: "We could not match your name. Please go back and check it.", invalid: "That role cannot be chosen here."
+      };
+      $("rlMsg").textContent = msgs[t] || "Done.";
+      return loadRoles(true);
+    }).catch(function (e) { $("rlMsg").textContent = rolesError(e); btn.disabled = false; });
+  }
+  $("rvForm").addEventListener("submit", function (ev) {
+    ev.preventDefault();
+    var msg = $("rvMsg"); msg.textContent = "";
+    var sn = $("rvSurname").value.trim(), fn = $("rvFirst").value.trim();
+    if (!sn || !fn) { msg.textContent = "Please enter your surname and first name."; return; }
+    if (!sb) { msg.textContent = "The page could not load. Check your connection and reload."; return; }
+    var btn = $("rvBtn"); btn.disabled = true; btn.textContent = "Checking...";
+    rolesWho = { surname: sn, first: fn };
+    loadRoles(false).then(function () {
+      if (rolesWho) { $("rvCard").hidden = true; $("rlWrap").hidden = false; window.scrollTo(0, 0); }
+    }).catch(function (e) { msg.textContent = rolesError(e); rolesWho = null; })
+      .then(function () { btn.disabled = false; btn.textContent = "Show the schedule"; });
+  });
+  $("rlSwitch").addEventListener("click", function () { setMode("roles"); });
+
   $("dupGo").addEventListener("click", function () {
     var sn = $("surname").value.trim(), fn = $("firstName").value.trim();
     setMode("edit");
@@ -295,6 +412,7 @@ legend { padding: 0; font-size: .72rem; letter-spacing: .07em; text-transform: u
   });
   $("tabNew").addEventListener("click", function () { setMode("new"); });
   $("tabEdit").addEventListener("click", function () { setMode("edit"); });
+  $("tabRoles").addEventListener("click", function () { setMode("roles"); });
   $("againBtn").addEventListener("click", function () { setMode(mode); });
 
   $("verifyForm").addEventListener("submit", function (ev) {
