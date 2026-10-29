@@ -135,10 +135,10 @@ legend { padding: 0; font-size: .72rem; letter-spacing: .07em; text-transform: u
 
   <div class="sheet" id="rvCard" hidden>
     <form class="vform" id="rvForm" novalidate>
-      <p class="intro" style="margin:0">Enter your name as it is in our records to see the schedule and choose the roles you want to take.</p>
+      <p class="intro" style="margin:0">Pick your name from the list, or type it, to see the schedule and choose the roles you want to take.</p>
       <div class="grid">
-        <div class="field"><label for="rvSurname">Surname</label><input id="rvSurname" autocomplete="off" required></div>
-        <div class="field"><label for="rvFirst">First name</label><input id="rvFirst" autocomplete="off" required></div>
+        <div class="field"><label for="rvSurname">Surname</label><input id="rvSurname" list="rvSurnameList" autocomplete="off" required><datalist id="rvSurnameList"></datalist></div>
+        <div class="field"><label for="rvFirst">First name</label><input id="rvFirst" list="rvFirstList" autocomplete="off" required><datalist id="rvFirstList"></datalist></div>
       </div>
       <p class="msg" id="rvMsg" role="alert"></p>
       <button class="btn" type="submit" id="rvBtn">Show the schedule</button>
@@ -327,6 +327,39 @@ legend { padding: 0; font-size: .72rem; letter-spacing: .07em; text-transform: u
     $("saveBtn").textContent = m === "edit" ? "Save changes" : "Submit";
     window.scrollTo(0, 0);
   }
+  // ---------- pick-list of names for the Assignments tab ----------
+  var NAMES = [], namesAsked = false;
+  function uniqSorted(list) {
+    var seen = {}, out = [];
+    list.forEach(function (v) { var k = String(v).trim().toLowerCase(); if (k && !seen[k]) { seen[k] = true; out.push(String(v).trim()); } });
+    return out.sort(function (a, b) { return a.localeCompare(b); });
+  }
+  function fillList(id, values) {
+    var dl = $(id); dl.textContent = "";
+    values.forEach(function (v) { var o = document.createElement("option"); o.value = v; dl.append(o); });
+  }
+  function fillFirstNames() {
+    var sn = $("rvSurname").value.trim().toLowerCase();
+    var pool = sn ? NAMES.filter(function (n) { return String(n.surname).trim().toLowerCase() === sn; }) : [];
+    fillList("rvFirstList", uniqSorted((pool.length ? pool : NAMES).map(function (n) { return n.first_name; })));
+    return pool;
+  }
+  function loadNames() {
+    if (namesAsked || !sb) return;
+    namesAsked = true;
+    sb.rpc("member_names").then(function (res) {
+      if (res.error || !res.data) { namesAsked = false; return; }   // not set up yet: the boxes still work by typing
+      NAMES = res.data;
+      fillList("rvSurnameList", uniqSorted(NAMES.map(function (n) { return n.surname; })));
+      fillFirstNames();
+    }).catch(function () { namesAsked = false; });
+  }
+  $("rvSurname").addEventListener("input", fillFirstNames);
+  $("rvSurname").addEventListener("change", function () {
+    var pool = fillFirstNames();
+    if (pool.length === 1 && !$("rvFirst").value.trim()) $("rvFirst").value = pool[0].first_name;   // only one person with that surname
+  });
+
   // ---------- choose assignments ----------
   var ROLE_ROWS = [["teacher", "Teacher", false], ["presider", "Presider", true], ["opening_prayer", "Opening & Food Prayer", true],
     ["pw_lead", "Lead for P&W", true], ["closing_prayer", "Closing Prayer", true], ["food_prep", "Food Preparation", true], ["cleaners", "Cleaners", true]];
@@ -430,7 +463,7 @@ legend { padding: 0; font-size: .72rem; letter-spacing: .07em; text-transform: u
   });
   $("tabNew").addEventListener("click", function () { setMode("new"); });
   $("tabEdit").addEventListener("click", function () { setMode("edit"); });
-  $("tabRoles").addEventListener("click", function () { setMode("roles"); });
+  $("tabRoles").addEventListener("click", function () { setMode("roles"); loadNames(); });
   $("againBtn").addEventListener("click", function () { setMode(mode); });
 
   $("verifyForm").addEventListener("submit", function (ev) {
