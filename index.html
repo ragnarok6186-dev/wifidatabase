@@ -167,6 +167,12 @@ legend { padding: 0; font-size: .72rem; letter-spacing: .07em; text-transform: u
 .adl dd { margin: 0; overflow-wrap: anywhere; }
 .adl dd.open { color: var(--muted); font-style: italic; }
 .abtns { display: flex; gap: 8px; flex-wrap: wrap; }
+.inl { display: flex; align-items: center; gap: 6px; font-size: .9rem; }
+.inl input, .pset textarea { border: 1px solid var(--line); background: var(--surface); border-radius: 8px; padding: 8px 10px; min-height: 40px; font: inherit; color: inherit; }
+.pset textarea { width: 100%; resize: vertical; }
+.pset summary { cursor: pointer; font-weight: 500; padding: 6px 0; }
+.pset .grid { margin-top: 8px; }
+#posterBox canvas { width: 100%; height: auto; border: 1px solid var(--line); border-radius: 8px; display: block; }
 .toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: max(20px, env(safe-area-inset-bottom, 0px)); background: var(--ink); color: var(--bg); padding: 10px 16px; border-radius: 999px; z-index: 30; font-size: .9rem; box-shadow: var(--shadow); max-width: calc(100% - 32px); }
 
 @media (max-width: 960px) { .tools { grid-template-columns: repeat(3, minmax(0, 1fr)); } .tools .search { grid-column: 1 / -1; } }
@@ -339,6 +345,7 @@ legend { padding: 0; font-size: .72rem; letter-spacing: .07em; text-transform: u
     <div class="hist">
       <div class="htools">
         <button class="btn primary" type="button" id="asnAdd">Add Saturday</button>
+        <button class="btn" type="button" id="asnShare">Share schedule (image)</button>
         <select id="asnFilter" aria-label="Show">
           <option value="upcoming">Upcoming</option><option value="past">Past</option><option value="all">All</option>
         </select>
@@ -361,8 +368,10 @@ legend { padding: 0; font-size: .72rem; letter-spacing: .07em; text-transform: u
       <datalist id="namesList"></datalist>
       <div class="grid">
         <div class="field"><label for="a_date">Date</label><input id="a_date" type="date" required></div>
+        <div class="field"><label for="a_lesson">Lesson <span class="opt">(e.g. Lesson 6)</span></label><input id="a_lesson" autocomplete="off" placeholder="Lesson 6 or Inter-BS Fellowship"></div>
         <div class="field"><label for="a_teacher">Teacher</label><input id="a_teacher" list="namesList" autocomplete="off"></div>
-        <div class="field" style="grid-column:1/-1"><label for="a_topic">Topic</label><input id="a_topic" autocomplete="off"></div>
+        <div class="field" style="grid-column:1/-1"><label for="a_topic">Topic</label><input id="a_topic" autocomplete="off" placeholder="Joshua"></div>
+        <div class="field" style="grid-column:1/-1"><label for="a_topic_desc">Topic description <span class="opt">(optional)</span></label><input id="a_topic_desc" autocomplete="off" placeholder="Conquest of Canaan and God's Faithfulness Revealed"></div>
         <div class="field"><label for="a_presider">Presider</label><input id="a_presider" list="namesList" autocomplete="off"></div>
         <div class="field"><label for="a_opening_prayer">Opening &amp; Food Prayer</label><input id="a_opening_prayer" list="namesList" autocomplete="off"></div>
         <div class="field"><label for="a_pw_lead">Lead for P&amp;W</label><input id="a_pw_lead" list="namesList" autocomplete="off"></div>
@@ -379,6 +388,38 @@ legend { padding: 0; font-size: .72rem; letter-spacing: .07em; text-transform: u
         </div>
       </div>
     </form>
+  </div>
+</div>
+
+<!-- Share schedule poster -->
+<div class="overlay" id="shareOverlay" hidden>
+  <div class="sheet" style="max-width:980px" role="dialog" aria-modal="true" aria-labelledby="shareTitle">
+    <header>
+      <h2 id="shareTitle">Share schedule</h2>
+      <button class="btn" type="button" id="shareClose">Close</button>
+    </header>
+    <div class="hist">
+      <div class="htools">
+        <label class="inl">From <input type="date" id="sh_from"></label>
+        <label class="inl">To <input type="date" id="sh_to"></label>
+        <button class="btn primary" type="button" id="shDownload">Download image</button>
+        <button class="btn" type="button" id="shCopy">Copy image</button>
+      </div>
+      <details class="pset">
+        <summary>Poster wording (title, location, verse)</summary>
+        <div class="grid">
+          <div class="field"><label for="p_title">Title</label><input id="p_title"></div>
+          <div class="field"><label for="p_subtitle">Subtitle</label><input id="p_subtitle"></div>
+          <div class="field"><label for="p_series">Series name</label><input id="p_series"></div>
+          <div class="field"><label for="p_tagline">Series tagline</label><input id="p_tagline"></div>
+          <div class="field" style="grid-column:1/-1"><label for="p_footer">Schedule and location line</label><input id="p_footer"></div>
+          <div class="field" style="grid-column:1/-1"><label for="p_verse">Verse</label><textarea id="p_verse" rows="3"></textarea></div>
+          <div class="field"><label for="p_verseRef">Verse reference</label><input id="p_verseRef"></div>
+        </div>
+      </details>
+      <p class="muted" id="shMsg" role="status"></p>
+      <div id="posterBox"></div>
+    </div>
   </div>
 </div>
 
@@ -764,8 +805,12 @@ legend { padding: 0; font-size: .72rem; letter-spacing: .07em; text-transform: u
   }
   function val(a, k) { return String(a[k] || "").trim(); }
   function asnMessage(a) {
-    var lines = ["Bible Study - " + asnLabel(a.bs_date)];
-    ASN_ROLES.forEach(function (r) { lines.push(r[1] + ": " + (val(a, r[0]) || "TBA")); });
+    var lines = ["Bible Study - " + (val(a, "lesson") ? val(a, "lesson") + " - " : "") + asnLabel(a.bs_date)];
+    ASN_ROLES.forEach(function (r) {
+      var v = val(a, r[0]) || "TBA";
+      if (r[0] === "topic" && val(a, "topic_desc")) v += " (" + val(a, "topic_desc") + ")";
+      lines.push(r[1] + ": " + v);
+    });
     if (val(a, "notes")) lines.push("Note: " + val(a, "notes"));
     return lines.join("\n");
   }
@@ -781,7 +826,7 @@ legend { padding: 0; font-size: .72rem; letter-spacing: .07em; text-transform: u
     $("asnMsg").textContent = rows.length ? "" : (mode === "upcoming" ? "No upcoming Saturdays yet. Click Add Saturday." : "Nothing to show.");
     rows.forEach(function (a) {
       var open = ASN_ROLES.filter(function (r) { return r[0] !== "topic" && !val(a, r[0]); }).length;
-      var head = h("div", { class: "ahead" }, h("span", { class: "adate", text: asnLabel(a.bs_date) }),
+      var head = h("div", { class: "ahead" }, h("span", { class: "adate", text: (val(a, "lesson") ? val(a, "lesson") + " \u00b7 " : "") + asnLabel(a.bs_date) }),
         open ? h("span", { class: "aopen", text: open + (open === 1 ? " role open" : " roles open") }) : null);
       var dl = h("dl", { class: "adl" });
       ASN_ROLES.forEach(function (r) {
@@ -818,6 +863,8 @@ legend { padding: 0; font-size: .72rem; letter-spacing: .07em; text-transform: u
     $("a_date").value = a ? a.bs_date : nextFreeSaturday();
     ASN_ROLES.forEach(function (r) { $("a_" + r[0]).value = a ? (a[r[0]] || "") : ""; });
     $("a_notes").value = a ? (a.notes || "") : "";
+    $("a_lesson").value = a ? (a.lesson || "") : "";
+    $("a_topic_desc").value = a ? (a.topic_desc || "") : "";
     $("asnDel").hidden = !a;
     $("asnEdit").hidden = false;
     $("a_teacher").focus();
@@ -834,7 +881,7 @@ legend { padding: 0; font-size: .72rem; letter-spacing: .07em; text-transform: u
   $("asnEdit").addEventListener("mousedown", function (ev) { if (ev.target === $("asnEdit")) closeAsnEdit(); });
   document.addEventListener("keydown", function (ev) {
     if (ev.key !== "Escape") return;
-    if (!$("asnEdit").hidden) closeAsnEdit(); else if (!$("asnOverlay").hidden) $("asnOverlay").hidden = true;
+    if (!$("shareOverlay").hidden) $("shareOverlay").hidden = true; else if (!$("asnEdit").hidden) closeAsnEdit(); else if (!$("asnOverlay").hidden) $("asnOverlay").hidden = true;
   });
   $("asnForm").addEventListener("submit", function (ev) {
     ev.preventDefault();
@@ -843,7 +890,7 @@ legend { padding: 0; font-size: .72rem; letter-spacing: .07em; text-transform: u
     if (!date) { msg.textContent = "Please pick the date."; $("a_date").focus(); return; }
     var clash = asn.some(function (a) { return a.bs_date === date && (!asnEditing || a.id !== asnEditing.id); });
     if (clash) { msg.textContent = "That Saturday already has assignments. Edit that one instead."; return; }
-    var row = { bs_date: date, notes: $("a_notes").value.trim() || null, updated_at: new Date().toISOString() };
+    var row = { bs_date: date, notes: $("a_notes").value.trim() || null, lesson: $("a_lesson").value.trim() || null, topic_desc: $("a_topic_desc").value.trim() || null, updated_at: new Date().toISOString() };
     ASN_ROLES.forEach(function (r) { row[r[0]] = $("a_" + r[0]).value.trim() || null; });
     var btn = $("asnSave"); btn.disabled = true; btn.textContent = "Saving...";
     var q = asnEditing ? sb.from("bs_assignments").update(row).eq("id", asnEditing.id) : sb.from("bs_assignments").insert(row);
@@ -852,6 +899,7 @@ legend { padding: 0; font-size: .72rem; letter-spacing: .07em; text-transform: u
       closeAsnEdit(); toast("Saved."); loadAsn();
     }).catch(function (e) {
       msg.textContent = (e && e.code === "23505") ? "That Saturday already has assignments. Edit that one instead."
+        : (e && (e.code === "PGRST204" || e.code === "42703")) ? "Please run assignments-update.sql in Supabase first (it adds the Lesson and Topic description fields)."
         : (e && (e.code === "42P01" || e.code === "PGRST205")) ? "Assignments are not set up yet. Run assignments.sql in Supabase."
         : "Could not save. Please try again.";
     }).then(function () { btn.disabled = false; btn.textContent = "Save"; });
@@ -868,6 +916,173 @@ legend { padding: 0; font-size: .72rem; letter-spacing: .07em; text-transform: u
       if (res.error) throw res.error;
       closeAsnEdit(); toast("Deleted."); loadAsn();
     }).catch(function () { $("asnFormMsg").textContent = "Could not delete. Please try again."; });
+  });
+
+  // ---------- share schedule as an image ----------
+  var POSTER_DEFAULT = {
+    title: "BS WALK IN FAITH", subtitle: "SCHEDULE & ASSIGNMENTS", series: "Bible Unlocked",
+    tagline: "DISCOVERING GOD'S STORY FROM GENESIS TO REVELATION",
+    footer: "SATURDAYS @ 6:30PM - FACE TO FACE - LOCATION: WASL R445 BLDG. ROOM 205, AL BARSHA 1",
+    verse: "And let us consider how we may spur one another on toward love and good deeds, not giving up meeting together, as some are in the habit of doing, but encouraging one another\u2014and all the more as you see the Day approaching.",
+    verseRef: "- HEBREWS 10:24-25"
+  };
+  var PKEYS = Object.keys(POSTER_DEFAULT), posterCanvas = null, posterTimer = null;
+  function posterCfg() {
+    var c = {}; try { c = JSON.parse(localStorage.getItem("bsPosterCfg") || "{}"); } catch (e) {}
+    var out = {}; PKEYS.forEach(function (k) { out[k] = typeof c[k] === "string" ? c[k] : POSTER_DEFAULT[k]; }); return out;
+  }
+  function readPosterInputs() { var c = {}; PKEYS.forEach(function (k) { c[k] = $("p_" + k).value; }); try { localStorage.setItem("bsPosterCfg", JSON.stringify(c)); } catch (e) {} return c; }
+  function wrapLines(ctx, text, maxW) {
+    var words = String(text).split(/\s+/).filter(Boolean), lines = [], cur = "";
+    words.forEach(function (w) {
+      var t = cur ? cur + " " + w : w;
+      if (ctx.measureText(t).width > maxW && cur) { lines.push(cur); cur = w; } else cur = t;
+    });
+    if (cur) lines.push(cur);
+    return lines;
+  }
+  function roundRect(ctx, x, y, w, hgt, r) {
+    ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + hgt, r); ctx.arcTo(x + w, y + hgt, x, y + hgt, r);
+    ctx.arcTo(x, y + hgt, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath();
+  }
+  function drawPoster(rows, cfg) {
+    var SANS = '"Instrument Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif', SERIF = '"Newsreader", Georgia, "Times New Roman", serif';
+    var W = 1600, M = 66, COLS = [150, 385, 157, 112, 163, 156, 144, 201];
+    var HEAD = ["DATE", "TOPIC", "TEACHER/\nFACILITATOR", "PRESIDER", "OPENING &\nFOOD PRAYER", "LEAD FOR P&W", "CLOSING\nPRAYER", "FOOD\nPREPARATION"];
+    var px = 22, LH = 27, BOLD = "", REG = "", HPX = 21;
+    var mc = document.createElement("canvas").getContext("2d");
+    function cellLines(parts, w) {
+      var out = [];
+      parts.forEach(function (p) { mc.font = p.b ? BOLD : REG; wrapLines(mc, p.t, w - 24).forEach(function (l) { out.push({ t: l, b: p.b }); }); });
+      return out;
+    }
+    var partsRows = rows.map(function (a) {
+      var p = parseDate(a.bs_date), d = p ? new Date(p.y, p.m - 1, p.d) : null;
+      var ds = d ? d.toLocaleDateString("en-GB", { month: "long" }).toUpperCase() + " " + d.getDate() : "";
+      var dateParts = []; if (val(a, "lesson")) dateParts.push({ t: val(a, "lesson").toUpperCase(), b: true }); dateParts.push({ t: ds, b: true });
+      var topicParts = []; if (val(a, "topic")) topicParts.push({ t: val(a, "topic").toUpperCase(), b: true });
+      if (val(a, "topic_desc")) { var ds2 = val(a, "topic_desc"); topicParts.push({ t: ds2.charAt(0) === "(" ? ds2 : "(" + ds2 + ")", b: false }); }
+      var names = ["teacher", "presider", "opening_prayer", "pw_lead", "closing_prayer", "food_prep"].map(function (k) { return [{ t: (val(a, k) || "TBA").toUpperCase(), b: true }]; });
+      return [dateParts, topicParts.length ? topicParts : [{ t: "TBA", b: true }]].concat(names);
+    });
+    // shrink the text a little if a long word would not fit its column
+    function fits(sz) {
+      mc.font = "700 " + sz + "px " + SANS;
+      return partsRows.every(function (pr) { return pr.every(function (parts, i) { return parts.every(function (p) { return p.t.split(/\s+/).every(function (w2) { return mc.measureText(w2).width <= COLS[i] - 18; }); }); }); });
+    }
+    while (px > 15 && !fits(px)) px--;
+    BOLD = "700 " + px + "px " + SANS; REG = "500 " + (px - 1) + "px " + SANS; LH = Math.round(px * 1.24);
+    while (HPX > 13) {
+      mc.font = "600 " + HPX + "px " + SANS;
+      if (HEAD.every(function (t, i) { return t.split("\n").every(function (l) { return mc.measureText(l).width <= COLS[i] - 14; }); })) break;
+      HPX--;
+    }
+    var laid = partsRows.map(function (pr) {
+      var cells = pr.map(function (parts, i) { return cellLines(parts, COLS[i]); });
+      var hh = Math.max.apply(null, cells.map(function (c) { return c.length; })) * LH + 34;
+      return { cells: cells, h: Math.max(96, hh) };
+    });
+    var TOP = 190, HEADH = 72, tableH = laid.reduce(function (s2, r) { return s2 + r.h; }, 0);
+    var footLines = []; mc.font = "italic 500 21px " + SANS;
+    var verseLines = cfg.verse.trim() ? wrapLines(mc, cfg.verse.trim(), W - 2 * M - 160) : [];
+    var pillH = 30 + 34 + verseLines.length * 28 + (cfg.verseRef.trim() ? 30 : 0) + 22;
+    var H = TOP + HEADH + tableH + 16 + pillH + 34;
+    var cv = document.createElement("canvas"); cv.width = W; cv.height = H;
+    var ctx = cv.getContext("2d");
+    var bg = ctx.createLinearGradient(0, 0, W, H); bg.addColorStop(0, "#fffaf4"); bg.addColorStop(1, "#efe2d4");
+    ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H);
+    var INK = "#5a4636", LINE = "#b9a99a";
+    // title block
+    ctx.textBaseline = "alphabetic"; ctx.textAlign = "left"; ctx.fillStyle = INK;
+    ctx.font = "600 68px " + SERIF; ctx.fillText(cfg.title.toUpperCase(), M, 98);
+    ctx.fillStyle = "#7b6a5c"; ctx.font = "500 31px " + SANS; try { ctx.letterSpacing = "7px"; } catch (e) {}
+    ctx.fillText(cfg.subtitle.toUpperCase(), M, 142); try { ctx.letterSpacing = "0px"; } catch (e) {}
+    ctx.textAlign = "right"; ctx.fillStyle = "#6b5444"; ctx.font = "italic 600 80px " + SERIF; ctx.fillText(cfg.series, W - M, 92);
+    if (cfg.tagline.trim()) {
+      ctx.font = "600 19px " + SANS; var tl = wrapLines(ctx, cfg.tagline.toUpperCase(), 380);
+      var bw = 420, bh = 16 + tl.length * 24, bx = W - M - bw, by = 104;
+      ctx.fillStyle = "rgba(255,255,255,.6)"; ctx.fillRect(bx, by, bw, bh);
+      ctx.fillStyle = INK; ctx.textAlign = "center"; tl.forEach(function (l, i) { ctx.fillText(l, bx + bw / 2, by + 26 + i * 24); });
+    }
+    // table header
+    var x = M, y = TOP, TW = COLS.reduce(function (a, b) { return a + b; }, 0);
+    ctx.fillStyle = "#7a6454"; ctx.fillRect(M, y, TW, HEADH);
+    ctx.fillStyle = "#ffffff"; ctx.font = "600 " + HPX + "px " + SANS; ctx.textAlign = "center";
+    COLS.forEach(function (cw, i) {
+      var ls = HEAD[i].split("\n"), startY = y + HEADH / 2 + 7 - (ls.length - 1) * 14;
+      ls.forEach(function (l, j) { ctx.fillText(l, x + cw / 2, startY + j * 28); });
+      x += cw;
+    });
+    // rows
+    y += HEADH;
+    laid.forEach(function (r) {
+      ctx.fillStyle = "rgba(255,255,255,.5)"; ctx.fillRect(M, y, TW, r.h);
+      var cx = M;
+      r.cells.forEach(function (lines, i) {
+        var cw = COLS[i], startY = y + r.h / 2 - (lines.length * LH) / 2 + LH - 7;
+        lines.forEach(function (l, j) { ctx.font = l.b ? BOLD : REG; ctx.fillStyle = INK; ctx.textAlign = "center"; ctx.fillText(l.t, cx + cw / 2, startY + j * LH); });
+        cx += cw;
+      });
+      y += r.h;
+    });
+    // grid
+    ctx.strokeStyle = LINE; ctx.lineWidth = 1.5; ctx.strokeRect(M, TOP, TW, HEADH + tableH);
+    var gx = M; COLS.forEach(function (cw) { gx += cw; ctx.beginPath(); ctx.moveTo(gx, TOP); ctx.lineTo(gx, TOP + HEADH + tableH); ctx.stroke(); });
+    var gy = TOP + HEADH; laid.forEach(function (r) { ctx.beginPath(); ctx.moveTo(M, gy); ctx.lineTo(M + TW, gy); ctx.stroke(); gy += r.h; });
+    // footer pill
+    var py = TOP + HEADH + tableH + 16, pg = ctx.createLinearGradient(M, py, W - M, py + pillH); pg.addColorStop(0, "#7a6454"); pg.addColorStop(1, "#a89480");
+    ctx.fillStyle = pg; roundRect(ctx, M, py, W - 2 * M, pillH, 48); ctx.fill();
+    ctx.fillStyle = "#ffffff"; ctx.textAlign = "center"; var ty = py + 44;
+    ctx.font = "700 25px " + SANS; ctx.fillText(cfg.footer.toUpperCase(), W / 2, ty); ty += 10;
+    ctx.font = "italic 500 21px " + SANS; verseLines.forEach(function (l) { ty += 28; ctx.fillText(l, W / 2, ty); });
+    if (cfg.verseRef.trim()) { ctx.font = "500 19px " + SANS; ty += 30; ctx.fillText(cfg.verseRef.toUpperCase(), W / 2, ty); }
+    return cv;
+  }
+  function renderPoster() {
+    var from = $("sh_from").value, to = $("sh_to").value, box = $("posterBox");
+    var rows = asn.filter(function (a) { return (!from || a.bs_date >= from) && (!to || a.bs_date <= to); })
+      .sort(function (p, q) { return p.bs_date > q.bs_date ? 1 : -1; });
+    box.textContent = ""; posterCanvas = null;
+    $("shDownload").disabled = $("shCopy").disabled = !rows.length;
+    if (!rows.length) { $("shMsg").textContent = "No Saturdays in this date range. Add them first, or change the dates."; return; }
+    $("shMsg").textContent = rows.length + (rows.length === 1 ? " Saturday" : " Saturdays") + " in this image.";
+    var fonts = [document.fonts && document.fonts.load('600 20px "Instrument Sans"'), document.fonts && document.fonts.load('600 20px "Newsreader"')];
+    Promise.all(fonts).catch(function () {}).then(function () {
+      posterCanvas = drawPoster(rows, readPosterInputs()); box.textContent = ""; box.append(posterCanvas);
+    });
+  }
+  function openShare() {
+    var c = posterCfg(); PKEYS.forEach(function (k) { $("p_" + k).value = c[k]; });
+    $("shareOverlay").hidden = false; $("shMsg").textContent = "Loading..."; $("posterBox").textContent = "";
+    sb.from("bs_assignments").select("*").order("bs_date", { ascending: true }).limit(500).then(function (res) {
+      if (res.error) throw res.error;
+      asn = res.data || [];
+      var today = isoLocal(new Date()), up = asn.filter(function (a) { return a.bs_date >= today; });
+      var start = up.length ? up[0].bs_date : nextFreeSaturday(), p = parseDate(start), e = new Date(p.y, p.m - 1, p.d + 49);
+      $("sh_from").value = start; $("sh_to").value = isoLocal(e);
+      renderPoster();
+    }).catch(function () { $("shMsg").textContent = "Could not load the assignments. Check that assignments.sql was run, then try again."; });
+  }
+  $("asnShare").addEventListener("click", openShare);
+  $("shareClose").addEventListener("click", function () { $("shareOverlay").hidden = true; });
+  $("shareOverlay").addEventListener("mousedown", function (ev) { if (ev.target === $("shareOverlay")) $("shareOverlay").hidden = true; });
+  ["sh_from", "sh_to"].forEach(function (id) { $(id).addEventListener("change", renderPoster); });
+  PKEYS.forEach(function (k) { $("p_" + k).addEventListener("input", function () { clearTimeout(posterTimer); posterTimer = setTimeout(renderPoster, 350); }); });
+  $("shDownload").addEventListener("click", function () {
+    if (!posterCanvas) return;
+    posterCanvas.toBlob(function (b) {
+      var a = document.createElement("a"); a.href = URL.createObjectURL(b);
+      a.download = "BS-Schedule-" + $("sh_from").value + "-to-" + $("sh_to").value + ".png";
+      document.body.appendChild(a); a.click(); a.remove(); setTimeout(function () { URL.revokeObjectURL(a.href); }, 2000);
+    }, "image/png");
+  });
+  $("shCopy").addEventListener("click", function () {
+    if (!posterCanvas) return;
+    posterCanvas.toBlob(function (b) {
+      if (navigator.clipboard && window.ClipboardItem) {
+        navigator.clipboard.write([new ClipboardItem({ "image/png": b })]).then(function () { toast("Image copied. Paste it in your group chat."); }, function () { toast("Could not copy. Please use Download image."); });
+      } else toast("Copying images is not supported here. Please use Download image.");
+    }, "image/png");
   });
 
   // ---------- history (added / edited / deleted) ----------
