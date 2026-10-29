@@ -341,12 +341,23 @@ legend { padding: 0; font-size: .72rem; letter-spacing: .07em; text-transform: u
       ? "Choosing assignments is not switched on yet. Please contact the group admin."
       : "Sorry, something went wrong. Please try again in a moment.";
   }
+  var lastItems = [], lastMe = "";
+  // Returns the key of the role this person already holds on an activity (Teacher included), or "".
+  function roleHeldBy(a, me) {
+    for (var i = 0; i < ROLE_ROWS.length; i++) {
+      var v = String(a[ROLE_ROWS[i][0]] || "").trim();
+      if (v && v.split(" & ").some(function (x) { return x.trim().toLowerCase() === me; })) return ROLE_ROWS[i][0];
+    }
+    return "";
+  }
   function renderRoles(data) {
     var box = $("rlList"); box.textContent = "";
     var me = String(data.name || "").toLowerCase();
     $("rlHello").textContent = "Hi " + data.name + "! Here is the upcoming schedule.";
     if (!data.items.length) { box.append(mk("p", "intro", "There are no upcoming activities yet. Please check again later.")); return; }
+    lastItems = data.items; lastMe = me;
     data.items.forEach(function (a) {
+      var heldRole = roleHeldBy(a, me);   // the role this person already has on this activity, if any
       var card = mk("div", "rcard");
       card.append(mk("div", "rdate", dateLabel(a.bs_date)));
       var sub = [a.lesson, a.topic ? a.topic + (a.topic_desc ? " (" + a.topic_desc + ")" : "") : ""].filter(Boolean).join(" \u2014 ");
@@ -359,8 +370,10 @@ legend { padding: 0; font-size: .72rem; letter-spacing: .07em; text-transform: u
         row.append(mk("span", "rv" + (!v ? " open" : mine ? " me" : ""), v ? (mine && names.length === 1 ? "You" : v) : (r[2] ? "Open" : "To be assigned")));
         var act = mk("span");
         if (r[2]) {
-          var canJoin = !mine && (!v || (r[0] === "food_prep" && names.length < 3));
+          var otherRole = !mine && heldRole && heldRole !== r[0];
+          var canJoin = !mine && !otherRole && (!v || (r[0] === "food_prep" && names.length < 3));
           if (mine) { var rel = mk("button", "btn sm ghost", "Remove me"); rel.type = "button"; rel.addEventListener("click", function () { claim(a.id, r[0], true, rel); }); act.append(rel); }
+          else if (otherRole) { act.append(mk("span", "hint", "Already have a role")); }
           else if (canJoin) { var go = mk("button", "btn sm", v ? "Join" : "Sign up"); go.type = "button"; go.addEventListener("click", function () { claim(a.id, r[0], false, go); }); act.append(go); }
         }
         row.append(act); card.append(row);
@@ -377,6 +390,10 @@ legend { padding: 0; font-size: .72rem; letter-spacing: .07em; text-transform: u
     });
   }
   function claim(id, role, release, btn) {
+    if (!release) {
+      var act = lastItems.filter(function (x) { return x.id === id; })[0], held = act ? roleHeldBy(act, lastMe) : "";
+      if (held && held !== role) { $("rlMsg").textContent = "You already have a role on that day. Remove it first if you want a different one."; return; }
+    }
     btn.disabled = true;
     sb.rpc("assignment_claim", { p_surname: rolesWho.surname, p_first: rolesWho.first, p_id: id, p_role: role, p_release: release }).then(function (res) {
       if (res.error) throw res.error;
@@ -384,7 +401,7 @@ legend { padding: 0; font-size: .72rem; letter-spacing: .07em; text-transform: u
         ok: release ? "Done. You have been removed from that role." : "Thank you! You are signed up.",
         already: "You already have that role.", taken: "Sorry, that role was just taken by someone else.",
         not_yours: "That role is not under your name.", gone: "That activity is no longer available.",
-        not_member: "We could not match your name. Please go back and check it.", invalid: "That role cannot be chosen here."
+        not_member: "We could not match your name. Please go back and check it.", has_role: "You already have another role on that day.", invalid: "That role cannot be chosen here."
       };
       $("rlMsg").textContent = msgs[t] || "Done.";
       return loadRoles(true);
