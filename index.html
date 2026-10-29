@@ -154,6 +154,8 @@ legend { padding: 0; font-size: .72rem; letter-spacing: .07em; text-transform: u
 .hbadge.added { background: var(--good-soft); color: var(--good); }
 .hbadge.updated { background: var(--accent-soft); color: var(--accent); }
 .hbadge.deleted { background: var(--warn-soft); color: var(--warn); }
+.hbadge.assigned { background: var(--good-soft); color: var(--good); }
+.hbadge.unassigned { background: var(--warn-soft); color: var(--warn); }
 .hsrc { color: var(--muted); font-size: .82rem; }
 .hchg { margin: 0; padding-left: 18px; font-size: .9rem; display: flex; flex-direction: column; gap: 2px; }
 .hchg .old { color: var(--muted); text-decoration: line-through; }
@@ -458,13 +460,13 @@ legend { padding: 0; font-size: .72rem; letter-spacing: .07em; text-transform: u
 <div class="overlay" id="histOverlay" hidden>
   <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="histTitle">
     <header>
-      <h2 id="histTitle">Edit and added history</h2>
+      <h2 id="histTitle">History</h2>
       <button class="btn" type="button" id="histClose">Close</button>
     </header>
     <div class="hist">
       <div class="htools">
         <select id="histFilter" aria-label="Filter history">
-          <option value="">All activity</option><option value="added">Added members</option><option value="updated">Edits</option><option value="deleted">Deleted</option>
+          <option value="">All activity</option><option value="added">Added members</option><option value="updated">Edits</option><option value="deleted">Deleted</option><option value="role">Role assignments</option>
         </select>
         <input class="hq" id="histQ" type="search" placeholder="Search a name" aria-label="Search history by name">
         <button class="btn" type="button" id="histRefresh">Refresh</button>
@@ -919,6 +921,7 @@ legend { padding: 0; font-size: .72rem; letter-spacing: .07em; text-transform: u
   });
   $("asnForm").addEventListener("submit", function (ev) {
     ev.preventDefault();
+    var prev = asnEditing;
     var msg = $("asnFormMsg"); msg.textContent = "";
     var date = $("a_date").value;
     if (!date) { msg.textContent = "Please pick the date."; $("a_date").focus(); return; }
@@ -931,6 +934,7 @@ legend { padding: 0; font-size: .72rem; letter-spacing: .07em; text-transform: u
     q.then(function (res) {
       if (res.error) throw res.error;
       closeAsnEdit(); toast("Saved."); loadAsn();
+      return logRoles(prev, row);
     }).catch(function (e) {
       msg.textContent = (e && e.code === "23505") ? "That Saturday already has assignments. Edit that one instead."
         : (e && (e.code === "PGRST204" || e.code === "42703")) ? "Please run assignments-update.sql in Supabase first (it adds the Lesson and Topic description fields)."
@@ -946,9 +950,11 @@ legend { padding: 0; font-size: .72rem; letter-spacing: .07em; text-transform: u
       asnDelTimer = setTimeout(resetAsnDel, 4000); return;
     }
     resetAsnDel();
+    var gone = asnEditing;
     sb.from("bs_assignments").delete().eq("id", asnEditing.id).then(function (res) {
       if (res.error) throw res.error;
       closeAsnEdit(); toast("Deleted."); loadAsn();
+      return logRoles(gone, null, "Activity deleted");
     }).catch(function () { $("asnFormMsg").textContent = "Could not delete. Please try again."; });
   });
 
@@ -1124,7 +1130,7 @@ legend { padding: 0; font-size: .72rem; letter-spacing: .07em; text-transform: u
     wedding_anniversary: "Wedding anniversary", children: "No. of children", mobile: "Mobile", email: "Email", bs_group: "BS Group",
     auxiliary: "Auxiliary", role: "Board / Member", year_joined: "Year joined", location: "Location", cgm: "CGM", cgm_year: "CGM year",
     baptism: "Baptism", baptism_year: "Baptism year" };
-  var histRows = [];
+  var histRows = [], histCapped = false, histNote = "";
   function hval(v) {
     if (v === null || v === undefined || v === "") return "(empty)";
     v = String(v);
@@ -1135,20 +1141,26 @@ legend { padding: 0; font-size: .72rem; letter-spacing: .07em; text-transform: u
     var list = $("histList"), f = $("histFilter").value, q = $("histQ").value.trim().toLowerCase();
     list.textContent = "";
     var rows = histRows.filter(function (r) {
-      return (!f || r.action === f) && (!q || String(r.member_name || "").toLowerCase().indexOf(q) !== -1);
+      return (!f || r.action === f || (f === "role" && r._role)) && (!q || String(r.member_name || "").toLowerCase().indexOf(q) !== -1);
     });
-    $("histMsg").textContent = rows.length ? rows.length + (rows.length === 1 ? " entry" : " entries") + (histRows.length >= 300 ? " (showing the latest 300)" : "") : "Nothing to show yet.";
+    $("histMsg").textContent = rows.length ? rows.length + (rows.length === 1 ? " entry" : " entries") + (histCapped ? " (showing the latest ones)" : "") : "Nothing to show yet.";
+    if (histNote) $("histMsg").textContent += " " + histNote;
     rows.forEach(function (r) {
       var li = document.createElement("li"); li.className = "hitem";
       var top = document.createElement("div"); top.className = "hrow";
       var left = document.createElement("div");
-      var badge = document.createElement("span"); badge.className = "hbadge " + r.action; badge.textContent = r.action === "added" ? "Added" : r.action === "updated" ? "Edited" : "Deleted";
+      var badge = document.createElement("span"); badge.className = "hbadge " + r.action; badge.textContent = r.action === "added" ? "Added" : r.action === "updated" ? "Edited" : r.action === "assigned" ? "Role given" : r.action === "unassigned" ? "Role removed" : "Deleted";
       var nm = document.createElement("span"); nm.className = "hname"; nm.textContent = r.member_name || "Unnamed";
       left.append(badge, nm);
       var when = document.createElement("span"); when.className = "hwhen";
       when.textContent = new Date(r.changed_at).toLocaleString("en-GB", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
       top.append(left, when); li.append(top);
       var src = document.createElement("div"); src.className = "hsrc"; src.textContent = "By: " + (r.source || "Admin"); li.append(src);
+      if (r._role) {
+        var rd = document.createElement("p"); rd.className = "hdet";
+        rd.textContent = [r.role, r.bs_date ? asnLabel(r.bs_date) : "", r.lesson || "", r.note || ""].filter(Boolean).join(" \u00b7 ");
+        li.append(rd); list.append(li); return;
+      }
       var ch = r.changes || {};
       if (r.action === "updated") {
         var ul = document.createElement("ul"); ul.className = "hchg";
@@ -1169,15 +1181,53 @@ legend { padding: 0; font-size: .72rem; letter-spacing: .07em; text-transform: u
   }
   function loadHistory() {
     $("histMsg").textContent = "Loading...";
-    sb.from("member_history").select("*").order("changed_at", { ascending: false }).limit(300).then(function (res) {
+    histNote = "";
+    var pm = sb.from("member_history").select("*").order("changed_at", { ascending: false }).limit(300).then(function (res) {
       if (res.error) throw res.error;
-      histRows = res.data || []; renderHistory();
+      return res.data || [];
+    });
+    var pr = sb.from("role_history").select("*").order("changed_at", { ascending: false }).limit(300).then(function (res) {
+      if (res.error) throw res.error;
+      return res.data || [];
+    }).catch(function () { histNote = "Role assignments are not showing yet. Run role-history.sql in Supabase, then press Refresh."; return []; });
+    Promise.all([pm, pr]).then(function (a) {
+      var roles = a[1].map(function (r) { r._role = true; return r; });
+      histCapped = a[0].length >= 300 || a[1].length >= 300;
+      histRows = a[0].concat(roles).sort(function (x, y) { return new Date(y.changed_at) - new Date(x.changed_at); });
+      renderHistory();
     }).catch(function (e) {
       histRows = []; $("histList").textContent = "";
       $("histMsg").textContent = (e && (e.code === "42P01" || e.code === "PGRST205" || /member_history/.test(e.message || "")))
         ? "History is not set up yet. Run history-log.sql in Supabase, then press Refresh."
         : "Could not load the history. Check your connection and press Refresh.";
     });
+  }
+  // ---- role assignment history: who was given or taken off a role ----
+  function splitNames(v) {
+    var seen = {}, out = [];
+    String(v || "").split(/\s*(?:,|;|&|\/|\+|\band\b)\s*/i).forEach(function (n) {
+      n = n.trim(); var k = n.toLowerCase();
+      if (n && !seen[k]) { seen[k] = true; out.push(n); }
+    });
+    return out;
+  }
+  function logRoles(prev, next, note) {
+    var base = next || prev; if (!base) return Promise.resolve();
+    var who = getSess("wifiUser") || "Admin", entries = [];
+    function mk(action, name, label) {
+      return { member_name: name, action: action, role: label, bs_date: base.bs_date || null, lesson: (base.lesson || "").trim() || null, note: note || null, source: who };
+    }
+    ASN_ROLES.forEach(function (r) {
+      if (r[0] === "topic") return;
+      var oldN = splitNames(prev && prev[r[0]]), newN = splitNames(next && next[r[0]]);
+      var oldK = oldN.map(function (n) { return n.toLowerCase(); }), newK = newN.map(function (n) { return n.toLowerCase(); });
+      newN.forEach(function (n, i) { if (oldK.indexOf(newK[i]) < 0) entries.push(mk("assigned", n, r[1])); });
+      oldN.forEach(function (n, i) { if (newK.indexOf(oldK[i]) < 0) entries.push(mk("unassigned", n, r[1])); });
+    });
+    if (!entries.length) return Promise.resolve();
+    return sb.from("role_history").insert(entries).then(function (res) {
+      if (res.error) throw res.error;
+    }).catch(function () { toast("Saved, but the role history could not be recorded. Run role-history.sql in Supabase."); });
   }
   $("histBtn").addEventListener("click", function () { $("histOverlay").hidden = false; loadHistory(); });
   $("histClose").addEventListener("click", function () { $("histOverlay").hidden = true; });
