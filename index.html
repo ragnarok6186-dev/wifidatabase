@@ -395,6 +395,7 @@ legend { padding: 0; font-size: .72rem; letter-spacing: .07em; text-transform: u
         <div class="field"><label for="a_pw_lead">Lead for P&amp;W</label><input id="a_pw_lead" list="namesList" autocomplete="off"></div>
         <div class="field"><label for="a_closing_prayer">Closing Prayer</label><input id="a_closing_prayer" list="namesList" autocomplete="off"></div>
         <div class="field" style="grid-column:1/-1"><label for="a_food_prep">Food Preparation <span class="opt">(one or more names)</span></label><input id="a_food_prep" list="namesList" autocomplete="off"></div>
+        <div class="field" style="grid-column:1/-1"><label for="a_cleaners">Cleaners <span class="opt">(one or more names)</span></label><input id="a_cleaners" list="namesList" autocomplete="off"></div>
         <div class="field" style="grid-column:1/-1"><label for="a_notes">Notes <span class="opt">(optional)</span></label><input id="a_notes" autocomplete="off"></div>
       </div>
       <p class="msg" id="asnFormMsg" role="alert"></p>
@@ -827,7 +828,7 @@ legend { padding: 0; font-size: .72rem; letter-spacing: .07em; text-transform: u
   });
   // ---------- Saturday bible study assignments ----------
   var ASN_ROLES = [["teacher", "Teacher"], ["topic", "Topic"], ["presider", "Presider"], ["opening_prayer", "Opening & Food Prayer"],
-    ["pw_lead", "Lead for P&W"], ["closing_prayer", "Closing Prayer"], ["food_prep", "Food Preparation"]];
+    ["pw_lead", "Lead for P&W"], ["closing_prayer", "Closing Prayer"], ["food_prep", "Food Preparation"], ["cleaners", "Cleaners"]];
   var asn = [], asnEditing = null, asnDelTimer = null;
   function isoLocal(d) { return d.getFullYear() + "-" + ("0" + (d.getMonth() + 1)).slice(-2) + "-" + ("0" + d.getDate()).slice(-2); }
   function asnLabel(iso) {
@@ -959,7 +960,7 @@ legend { padding: 0; font-size: .72rem; letter-spacing: .07em; text-transform: u
       closeAsnEdit(); toast("Saved."); loadAsn();
     }).catch(function (e) {
       msg.textContent = (e && e.code === "23505") ? "That Saturday already has assignments. Edit that one instead."
-        : (e && (e.code === "PGRST204" || e.code === "42703")) ? "Please run assignments-update.sql in Supabase first (it adds the Lesson and Topic description fields)."
+        : (e && (e.code === "PGRST204" || e.code === "42703")) ? (/cleaners/i.test(e.message || "") ? "Please run assignments-cleaners.sql in Supabase first (it adds the Cleaners field)." : "Please run assignments-update.sql in Supabase first (it adds the Lesson and Topic description fields).")
         : (e && (e.code === "42P01" || e.code === "PGRST205")) ? "Assignments are not set up yet. Run assignments.sql in Supabase."
         : "Could not save. Please try again.";
     }).then(function () { btn.disabled = false; btn.textContent = "Save"; });
@@ -1014,7 +1015,7 @@ legend { padding: 0; font-size: .72rem; letter-spacing: .07em; text-transform: u
     var PAL = [["#c8553d", "#fbe6df", "#9c3a25"], ["#d98e04", "#fdf1d3", "#8a5a00"], ["#2a8f87", "#dcf2ef", "#1d6b65"], ["#8e4585", "#f2e3f0", "#6e3068"], ["#5f8a3c", "#e6f1db", "#44662a"]];
     var NAMEF = "600 22px " + SANS, TOPICF = "600 32px " + SERIF, DESCF = "500 19px " + SANS;
     var RK = [["teacher", "Teacher / Facilitator"], ["presider", "Presider"], ["opening_prayer", "Opening & Food Prayer"],
-      ["pw_lead", "Lead for P&W"], ["closing_prayer", "Closing Prayer"], ["food_prep", "Food Preparation"]];
+      ["pw_lead", "Lead for P&W"], ["closing_prayer", "Closing Prayer"], ["food_prep", "Food Preparation"], ["cleaners", "Cleaners"]];
     var mc = document.createElement("canvas").getContext("2d");
     function wrapF(font, text, w) { mc.font = font; return wrapLines(mc, text, w); }
     var cards = rows.map(function (a, i) {
@@ -1026,12 +1027,14 @@ legend { padding: 0; font-size: .72rem; letter-spacing: .07em; text-transform: u
       var desc = val(a, "topic_desc"); c.desc = desc ? wrapF(DESCF, desc, CW - 2 * P) : [];
       c.cells = RK.map(function (r) {
         var v = val(a, r[0]), ls = [];
-        if (v) v.split(/\s*&\s*/).forEach(function (n) { if (n) wrapF(NAMEF, n, TXTW).forEach(function (l) { ls.push(l); }); });
+        if (r[0] === "cleaners") { if (v) wrapF(NAMEF, v.split(/\s*&\s*/).filter(Boolean).join("  \u00b7  "), CW - 2 * P - 28).forEach(function (l) { ls.push(l); }); }
+        else if (v) v.split(/\s*&\s*/).forEach(function (n) { if (n) wrapF(NAMEF, n, TXTW).forEach(function (l) { ls.push(l); }); });
         return { label: r[1].toUpperCase(), lines: ls };
       });
       c.rowH = [0, 1, 2].map(function (r) { return 46 + Math.max(c.cells[r * 2].lines.length, c.cells[r * 2 + 1].lines.length, 1) * LHN; });
+      c.rowH.push(46 + Math.max(c.cells[6].lines.length, 1) * LHN);
       c.topicH = 24 + c.topic.length * LHT + (c.desc.length ? 6 + c.desc.length * LHD : 0) + 18;
-      c.h = HEADERH + c.topicH + c.rowH[0] + c.rowH[1] + c.rowH[2] + 2 * RGAP + 22;
+      c.h = HEADERH + c.topicH + c.rowH[0] + c.rowH[1] + c.rowH[2] + c.rowH[3] + 3 * RGAP + 22;
       return c;
     });
     var gridRows = [];
@@ -1124,6 +1127,11 @@ legend { padding: 0; font-size: .72rem; letter-spacing: .07em; text-transform: u
           });
           ry += c.rowH[r] + RGAP;
         });
+        var cl = c.cells[6], clx = x + P;
+        ctx.fillStyle = tint; roundRect(ctx, clx, ry, CW - 2 * P, c.rowH[3], 14); ctx.fill();
+        ctx.textAlign = "left"; ctx.fillStyle = dark; ctx.font = "600 13px " + SANS; ls(1.6); ctx.fillText(cl.label, clx + 14, ry + 27); ls(0);
+        if (cl.lines.length) { ctx.fillStyle = "#3b2a20"; ctx.font = NAMEF; cl.lines.forEach(function (l, i) { ctx.fillText(l, clx + 14, ry + 57 + i * LHN); }); }
+        else { ctx.fillStyle = "#a8978a"; ctx.font = "italic 500 20px " + SANS; ctx.fillText("TBA", clx + 14, ry + 57); }
       });
       y += gr.h + GAP;
     });
