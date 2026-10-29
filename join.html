@@ -329,7 +329,7 @@ legend { padding: 0; font-size: .72rem; letter-spacing: .07em; text-transform: u
   }
   // ---------- choose assignments ----------
   var ROLE_ROWS = [["teacher", "Teacher", false], ["presider", "Presider", true], ["opening_prayer", "Opening & Food Prayer", true],
-    ["pw_lead", "Lead for P&W", true], ["closing_prayer", "Closing Prayer", true], ["food_prep", "Food Preparation", true]];
+    ["pw_lead", "Lead for P&W", true], ["closing_prayer", "Closing Prayer", true], ["food_prep", "Food Preparation", true], ["cleaners", "Cleaners", true]];
   function mk(tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
   function dateLabel(iso) {
     var p = String(iso).split("-").map(Number);
@@ -363,6 +363,7 @@ legend { padding: 0; font-size: .72rem; letter-spacing: .07em; text-transform: u
       var sub = [a.lesson, a.topic ? a.topic + (a.topic_desc ? " (" + a.topic_desc + ")" : "") : ""].filter(Boolean).join(" \u2014 ");
       if (sub) card.append(mk("div", "rsub", sub));
       ROLE_ROWS.forEach(function (r) {
+        if (r[0] === "cleaners" && !("cleaners" in a)) return;   // shown once the Cleaners field exists in the database
         var v = String(a[r[0]] || "").trim(), names = v ? v.split(" & ").map(function (x) { return x.trim(); }) : [];
         var mine = names.some(function (x) { return x.toLowerCase() === me; });
         var row = mk("div", "rrow");
@@ -371,7 +372,7 @@ legend { padding: 0; font-size: .72rem; letter-spacing: .07em; text-transform: u
         var act = mk("span");
         if (r[2]) {
           var otherRole = !mine && heldRole && heldRole !== r[0];
-          var canJoin = !mine && !otherRole && (!v || (r[0] === "food_prep" && names.length < 3));
+          var canJoin = !mine && !otherRole && (!v || ((r[0] === "food_prep" || r[0] === "cleaners") && names.length < 3));
           if (mine) { var rel = mk("button", "btn sm ghost", "Remove me"); rel.type = "button"; rel.addEventListener("click", function () { claim(a.id, r[0], true, rel); }); act.append(rel); }
           else if (otherRole) { act.append(mk("span", "hint", "Already have a role")); }
           else if (canJoin) { var go = mk("button", "btn sm", v ? "Join" : "Sign up"); go.type = "button"; go.addEventListener("click", function () { claim(a.id, r[0], false, go); }); act.append(go); }
