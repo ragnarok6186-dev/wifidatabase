@@ -122,10 +122,10 @@ legend { padding: 0; font-size: .72rem; letter-spacing: .07em; text-transform: u
 
   <div class="sheet" id="verifyCard" hidden>
     <form class="vform" id="verifyForm" novalidate>
-      <p class="intro" style="margin:0">To update your details, enter your name and date of birth exactly as they are in our records.</p>
+      <p class="intro" style="margin:0">To update your details, pick your name from the list (or type it) and enter your date of birth exactly as it is in our records.</p>
       <div class="grid">
-        <div class="field"><label for="vSurname">Surname</label><input id="vSurname" autocomplete="off" required></div>
-        <div class="field"><label for="vFirst">First name</label><input id="vFirst" autocomplete="off" required></div>
+        <div class="field"><label for="vSurname">Surname</label><input id="vSurname" list="vSurnameList" autocomplete="off" required><datalist id="vSurnameList"></datalist></div>
+        <div class="field"><label for="vFirst">First name</label><input id="vFirst" list="vFirstList" autocomplete="off" required><datalist id="vFirstList"></datalist></div>
         <div class="field"><label for="vBirthday">Date of birth</label><input id="vBirthday" type="date" required></div>
       </div>
       <p class="msg" id="vMsg" role="alert"></p>
@@ -325,6 +325,7 @@ legend { padding: 0; font-size: .72rem; letter-spacing: .07em; text-transform: u
     $("form").reset(); syncConditional();
     $("formMsg").textContent = ""; $("vMsg").textContent = ""; $("rvMsg").textContent = "";
     $("saveBtn").textContent = m === "edit" ? "Save changes" : "Submit";
+    if (m !== "new") loadNames();
     window.scrollTo(0, 0);
   }
   // ---------- pick-list of names for the Assignments tab ----------
@@ -338,10 +339,12 @@ legend { padding: 0; font-size: .72rem; letter-spacing: .07em; text-transform: u
     var dl = $(id); dl.textContent = "";
     values.forEach(function (v) { var o = document.createElement("option"); o.value = v; dl.append(o); });
   }
-  function fillFirstNames() {
-    var sn = $("rvSurname").value.trim().toLowerCase();
+  // the two forms that ask for a name: [surname box, first name box, surname list, first name list]
+  var PICK = [["rvSurname", "rvFirst", "rvSurnameList", "rvFirstList"], ["vSurname", "vFirst", "vSurnameList", "vFirstList"]];
+  function fillFirstNames(pk) {
+    var sn = $(pk[0]).value.trim().toLowerCase();
     var pool = sn ? NAMES.filter(function (n) { return String(n.surname).trim().toLowerCase() === sn; }) : [];
-    fillList("rvFirstList", uniqSorted((pool.length ? pool : NAMES).map(function (n) { return n.first_name; })));
+    fillList(pk[3], uniqSorted((pool.length ? pool : NAMES).map(function (n) { return n.first_name; })));
     return pool;
   }
   function loadNames() {
@@ -350,14 +353,18 @@ legend { padding: 0; font-size: .72rem; letter-spacing: .07em; text-transform: u
     sb.rpc("member_names").then(function (res) {
       if (res.error || !res.data) { namesAsked = false; return; }   // not set up yet: the boxes still work by typing
       NAMES = res.data;
-      fillList("rvSurnameList", uniqSorted(NAMES.map(function (n) { return n.surname; })));
-      fillFirstNames();
+      PICK.forEach(function (pk) {
+        fillList(pk[2], uniqSorted(NAMES.map(function (n) { return n.surname; })));
+        fillFirstNames(pk);
+      });
     }).catch(function () { namesAsked = false; });
   }
-  $("rvSurname").addEventListener("input", fillFirstNames);
-  $("rvSurname").addEventListener("change", function () {
-    var pool = fillFirstNames();
-    if (pool.length === 1 && !$("rvFirst").value.trim()) $("rvFirst").value = pool[0].first_name;   // only one person with that surname
+  PICK.forEach(function (pk) {
+    $(pk[0]).addEventListener("input", function () { fillFirstNames(pk); });
+    $(pk[0]).addEventListener("change", function () {
+      var pool = fillFirstNames(pk);
+      if (pool.length === 1 && !$(pk[1]).value.trim()) $(pk[1]).value = pool[0].first_name;   // only one person with that surname
+    });
   });
 
   // ---------- choose assignments ----------
