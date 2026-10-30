@@ -285,13 +285,13 @@ legend { padding: 0; font-size: .72rem; letter-spacing: .07em; text-transform: u
     </div>
     <div class="actions">
       <button class="btn" id="dashBtn" type="button">Dashboard</button>
+      <button class="btn" id="asnBtn" type="button">Assignments</button>
+      <button class="btn" id="shareBtn" type="button">Copy form link</button>
+      <button class="btn" id="histBtn" type="button">History</button>
       <button class="btn" id="importBtn" type="button">Import Excel</button>
       <button class="btn" id="exportBtn" type="button">Export Excel</button>
-      <button class="btn" id="asnBtn" type="button">Assignments</button>
-      <button class="btn" id="histBtn" type="button">History</button>
-      <button class="btn" id="shareBtn" type="button">Copy form link</button>
-      <button class="btn primary" id="addBtn" type="button">Add member</button>
       <button class="btn" id="officersBtn" type="button" hidden>Officer accounts</button>
+      <button class="btn primary" id="addBtn" type="button">Add member</button>
       <button class="btn" id="signOutBtn" type="button">Sign out</button>
     </div>
   </div>
@@ -399,7 +399,7 @@ legend { padding: 0; font-size: .72rem; letter-spacing: .07em; text-transform: u
       <h2 id="dashTitle">Dashboard</h2>
       <div class="htools">
         <button class="btn" type="button" id="dashRefresh">Refresh</button>
-        <button class="btn" type="button" id="dashClose">Close</button>
+        <button class="btn" type="button" id="dashClose">Member list</button>
       </div>
     </header>
     <div class="dashbody">
@@ -815,7 +815,7 @@ legend { padding: 0; font-size: .72rem; letter-spacing: .07em; text-transform: u
         h("td", { "data-label": "Joined FCC", class: "num", text: plain(m.yearJoined) })));
     });
   }
-  function renderAll() { renderStats(); renderFilters(); renderUpcoming(); renderTable(); }
+  function renderAll() { renderStats(); renderFilters(); renderUpcoming(); renderTable(); refreshDashIfOpen(); }
 
   // ---------- member form ----------
   var FIELDS = MAP.map(function (p) { return p[0]; });
@@ -1706,6 +1706,7 @@ legend { padding: 0; font-size: .72rem; letter-spacing: .07em; text-transform: u
     if (!$("officersBtn").hidden) loadOfficers(true);
     if (!loaded) renderAll();
     loadAll();
+    if (!dashOpened) { dashOpened = true; openDash(); }   // the Dashboard is the opening page
   }
   function setSess(user, key) {
     try {
@@ -2019,7 +2020,16 @@ legend { padding: 0; font-size: .72rem; letter-spacing: .07em; text-transform: u
     }).catch(function () { dashAsn = []; });
     return Promise.all([p1, p2]).then(renderDash);
   }
-  $("dashBtn").addEventListener("click", function () { $("dashOverlay").hidden = false; renderDash(); loadDash(); });
+  var dashOpened = false;
+  function openDash() { $("dashOverlay").hidden = false; renderDash(); loadDash(); }
+  // keeps the dashboard current when the member list finishes loading, without wiping a leader name being typed
+  function refreshDashIfOpen() {
+    if ($("dashOverlay").hidden) return;
+    var ae = document.activeElement;
+    if (ae && $("dLeaders").contains(ae)) { renderDashTiles(); renderDashCharts(); return; }
+    renderDash();
+  }
+  $("dashBtn").addEventListener("click", openDash);
   $("dashClose").addEventListener("click", function () { $("dashOverlay").hidden = true; });
   $("dashRefresh").addEventListener("click", function () { Promise.resolve(loadAll()).then(loadDash); });
   $("dAddGroup").addEventListener("click", function () {
