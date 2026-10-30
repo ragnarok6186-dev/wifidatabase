@@ -347,12 +347,25 @@ legend { padding: 0; font-size: .72rem; letter-spacing: .07em; text-transform: u
     fillList(pk[3], uniqSorted((pool.length ? pool : NAMES).map(function (n) { return n.first_name; })));
     return pool;
   }
+  // "first surname" (lower case) -> the label used for Food Preparation and Cleaners: nickname, else first name,
+  // else the full name when two people would share the same label. Needs the nickname from member_names().
+  var LABEL_OF = {};
+  function buildLabels() {
+    LABEL_OF = {};
+    if (!NAMES.length || !("nickname" in NAMES[0])) return;
+    var lab = NAMES.map(function (n) {
+      var f = String(n.first_name || "").trim(), sn = String(n.surname || "").trim();
+      return { full: (f + " " + sn).trim(), pick: String(n.nickname || f).trim() };
+    }), cnt = {};
+    lab.forEach(function (x) { var k = x.pick.toLowerCase(); cnt[k] = (cnt[k] || 0) + 1; });
+    lab.forEach(function (x) { LABEL_OF[x.full.toLowerCase()] = (x.pick && cnt[x.pick.toLowerCase()] === 1) ? x.pick : x.full; });
+  }
   function loadNames() {
     if (namesAsked || !sb) return;
     namesAsked = true;
     sb.rpc("member_names").then(function (res) {
       if (res.error || !res.data) { namesAsked = false; return; }   // not set up yet: the boxes still work by typing
-      NAMES = res.data;
+      NAMES = res.data; buildLabels();
       PICK.forEach(function (pk) {
         fillList(pk[2], uniqSorted(NAMES.map(function (n) { return n.surname; })));
         fillFirstNames(pk);
@@ -381,12 +394,13 @@ legend { padding: 0; font-size: .72rem; letter-spacing: .07em; text-transform: u
       ? "Choosing assignments is not switched on yet. Please contact the group admin."
       : "Sorry, something went wrong. Please try again in a moment.";
   }
-  var lastItems = [], lastMe = "";
+  var lastItems = [], lastMe = "", meKeys = {};
+  function isMe(x) { return !!meKeys[String(x).trim().toLowerCase()]; }   // full name, or the nickname the admin may have used
   // Returns the key of the role this person already holds on an activity (Teacher included), or "".
-  function roleHeldBy(a, me) {
+  function roleHeldBy(a) {
     for (var i = 0; i < ROLE_ROWS.length; i++) {
       var v = String(a[ROLE_ROWS[i][0]] || "").trim();
-      if (v && v.split(" & ").some(function (x) { return x.trim().toLowerCase() === me; })) return ROLE_ROWS[i][0];
+      if (v && v.split(" & ").some(isMe)) return ROLE_ROWS[i][0];
     }
     return "";
   }
@@ -396,8 +410,9 @@ legend { padding: 0; font-size: .72rem; letter-spacing: .07em; text-transform: u
     $("rlHello").textContent = "Hi " + data.name + "! Here is the upcoming schedule.";
     if (!data.items.length) { box.append(mk("p", "intro", "There are no upcoming activities yet. Please check again later.")); return; }
     lastItems = data.items; lastMe = me;
+    meKeys = {}; meKeys[me] = true; if (LABEL_OF[me]) meKeys[LABEL_OF[me].toLowerCase()] = true;
     data.items.forEach(function (a) {
-      var heldRole = roleHeldBy(a, me);   // the role this person already has on this activity, if any
+      var heldRole = roleHeldBy(a);   // the role this person already has on this activity, if any
       var card = mk("div", "rcard");
       card.append(mk("div", "rdate", dateLabel(a.bs_date)));
       var sub = [a.lesson, a.topic ? a.topic + (a.topic_desc ? " (" + a.topic_desc + ")" : "") : ""].filter(Boolean).join(" \u2014 ");
@@ -405,10 +420,11 @@ legend { padding: 0; font-size: .72rem; letter-spacing: .07em; text-transform: u
       ROLE_ROWS.forEach(function (r) {
         if (r[0] === "cleaners" && !("cleaners" in a)) return;   // shown once the Cleaners field exists in the database
         var v = String(a[r[0]] || "").trim(), names = v ? v.split(" & ").map(function (x) { return x.trim(); }) : [];
-        var mine = names.some(function (x) { return x.toLowerCase() === me; });
+        var mine = names.some(isMe);
+        var shown = (r[0] === "food_prep" || r[0] === "cleaners") ? names.map(function (x) { return LABEL_OF[x.toLowerCase()] || x; }).join(" & ") : v;
         var row = mk("div", "rrow");
         row.append(mk("span", "rl", r[1]));
-        row.append(mk("span", "rv" + (!v ? " open" : mine ? " me" : ""), v ? (mine && names.length === 1 ? "You" : v) : (r[2] ? "Open" : "To be assigned")));
+        row.append(mk("span", "rv" + (!v ? " open" : mine ? " me" : ""), v ? (mine && names.length === 1 ? "You" : shown) : (r[2] ? "Open" : "To be assigned")));
         var act = mk("span");
         if (r[2]) {
           var otherRole = !mine && heldRole && heldRole !== r[0];
@@ -432,7 +448,7 @@ legend { padding: 0; font-size: .72rem; letter-spacing: .07em; text-transform: u
   }
   function claim(id, role, release, btn) {
     if (!release) {
-      var act = lastItems.filter(function (x) { return x.id === id; })[0], held = act ? roleHeldBy(act, lastMe) : "";
+      var act = lastItems.filter(function (x) { return x.id === id; })[0], held = act ? roleHeldBy(act) : "";
       if (held && held !== role) { $("rlMsg").textContent = "You already have a role on that day. Remove it first if you want a different one."; return; }
     }
     btn.disabled = true;
