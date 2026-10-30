@@ -130,6 +130,8 @@ legend { padding: 0; font-size: .72rem; letter-spacing: .07em; text-transform: u
 .field { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
 .field label { font-size: .85rem; font-weight: 500; }
 .field .opt { color: var(--muted); font-weight: 400; }
+.trio { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+@media (max-width: 560px) { .trio { grid-template-columns: minmax(0, 1fr); } }
 .msg { min-height: 1.4em; margin: 0; font-size: .9rem; color: var(--danger); }
 .msg.info { color: var(--muted); }
 .foot { display: flex; flex-wrap: wrap; gap: 8px; justify-content: space-between; padding-top: 8px; }
@@ -394,8 +396,8 @@ legend { padding: 0; font-size: .72rem; letter-spacing: .07em; text-transform: u
         <div class="field"><label for="a_opening_prayer">Opening &amp; Food Prayer</label><input id="a_opening_prayer" list="namesList" autocomplete="off"></div>
         <div class="field"><label for="a_pw_lead">Lead for P&amp;W</label><input id="a_pw_lead" list="namesList" autocomplete="off"></div>
         <div class="field"><label for="a_closing_prayer">Closing Prayer</label><input id="a_closing_prayer" list="namesList" autocomplete="off"></div>
-        <div class="field" style="grid-column:1/-1"><label for="a_food_prep">Food Preparation <span class="opt">(one or more names)</span></label><input id="a_food_prep" list="namesList" autocomplete="off"></div>
-        <div class="field" style="grid-column:1/-1"><label for="a_cleaners">Cleaners <span class="opt">(2 to 3 names)</span></label><input id="a_cleaners" list="namesList" autocomplete="off"></div>
+        <div class="field" style="grid-column:1/-1" role="group" aria-label="Food Preparation"><label for="a_food_prep_1">Food Preparation <span class="opt">(2 to 3 names)</span></label><div class="trio"><input id="a_food_prep_1" list="namesList" autocomplete="off" placeholder="Name 1"><input id="a_food_prep_2" list="namesList" autocomplete="off" placeholder="Name 2"><input id="a_food_prep_3" list="namesList" autocomplete="off" placeholder="Name 3 (optional)"></div></div>
+        <div class="field" style="grid-column:1/-1" role="group" aria-label="Cleaners"><label for="a_cleaners_1">Cleaners <span class="opt">(2 to 3 names)</span></label><div class="trio"><input id="a_cleaners_1" list="namesList" autocomplete="off" placeholder="Name 1"><input id="a_cleaners_2" list="namesList" autocomplete="off" placeholder="Name 2"><input id="a_cleaners_3" list="namesList" autocomplete="off" placeholder="Name 3 (optional)"></div></div>
         <div class="field" style="grid-column:1/-1"><label for="a_notes">Notes <span class="opt">(optional)</span></label><input id="a_notes" autocomplete="off"></div>
       </div>
       <p class="msg" id="asnFormMsg" role="alert"></p>
@@ -830,6 +832,15 @@ legend { padding: 0; font-size: .72rem; letter-spacing: .07em; text-transform: u
   var ASN_ROLES = [["teacher", "Teacher"], ["topic", "Topic"], ["presider", "Presider"], ["opening_prayer", "Opening & Food Prayer"],
     ["pw_lead", "Lead for P&W"], ["closing_prayer", "Closing Prayer"], ["food_prep", "Food Preparation"], ["cleaners", "Cleaners"]];
   var asn = [], asnEditing = null, asnDelTimer = null;
+  // Food Preparation and Cleaners have three name boxes each; the names are saved joined with " & ".
+  var MULTI = { food_prep: 1, cleaners: 1 }, MAX_NAMES = 3;
+  function roleInputs(key) { return MULTI[key] ? [1, 2, 3].map(function (i) { return $("a_" + key + "_" + i); }) : [$("a_" + key)]; }
+  function getRoleVal(key) { return roleInputs(key).map(function (el) { return el.value.trim(); }).filter(Boolean).join(" & "); }
+  function setRoleVal(key, v) {
+    var inputs = roleInputs(key), parts = MULTI[key] ? splitNames(v) : [String(v || "")];
+    if (MULTI[key] && parts.length > MAX_NAMES) parts = parts.slice(0, MAX_NAMES - 1).concat(parts.slice(MAX_NAMES - 1).join(" & "));
+    inputs.forEach(function (el, i) { el.value = parts[i] || ""; });
+  }
   function isoLocal(d) { return d.getFullYear() + "-" + ("0" + (d.getMonth() + 1)).slice(-2) + "-" + ("0" + d.getDate()).slice(-2); }
   function asnLabel(iso) {
     var p = parseDate(iso);
@@ -903,7 +914,7 @@ legend { padding: 0; font-size: .72rem; letter-spacing: .07em; text-transform: u
     var dl = $("namesList"); dl.textContent = "";
     members.map(fullName).sort().forEach(function (n) { var o = document.createElement("option"); o.value = n; dl.append(o); });
     $("a_date").value = a ? a.bs_date : nextFreeSaturday();
-    ASN_ROLES.forEach(function (r) { $("a_" + r[0]).value = a ? (a[r[0]] || "") : ""; });
+    ASN_ROLES.forEach(function (r) { setRoleVal(r[0], a ? (a[r[0]] || "") : ""); });
     $("a_notes").value = a ? (a.notes || "") : "";
     $("a_lesson").value = a ? (a.lesson || "") : "";
     $("a_topic_desc").value = a ? (a.topic_desc || "") : "";
@@ -937,18 +948,27 @@ legend { padding: 0; font-size: .72rem; letter-spacing: .07em; text-transform: u
     var held = {}, dupMsg = "";
     ASN_ROLES.forEach(function (r) {
       if (dupMsg || r[0] === "topic") return;
-      splitNames($("a_" + r[0]).value).forEach(function (n) {
+      if (MULTI[r[0]]) {   // the same name in two boxes of one role
+        var seenIn = {};
+        roleInputs(r[0]).forEach(function (el) {
+          var n = el.value.trim(), k = n.toLowerCase();
+          if (!n || dupMsg) return;
+          if (seenIn[k]) { dupMsg = n + " is listed twice in " + r[1] + ". Please use a different name."; el.focus(); } else seenIn[k] = true;
+        });
+        if (dupMsg) return;
+        var cnt = splitNames(getRoleVal(r[0])).length;
+        if (cnt > MAX_NAMES) { dupMsg = r[1] + " can have up to " + MAX_NAMES + " names. You entered " + cnt + "."; roleInputs(r[0])[0].focus(); return; }
+      }
+      splitNames(getRoleVal(r[0])).forEach(function (n) {
         if (dupMsg) return;
         var k = n.toLowerCase();
-        if (held[k] && held[k] !== r[1]) { dupMsg = n + " is already assigned as " + held[k] + ". One person can only have one role per activity, so please choose a different name for " + r[1] + "."; $("a_" + r[0]).focus(); }
+        if (held[k] && held[k] !== r[1]) { dupMsg = n + " is already assigned as " + held[k] + ". One person can only have one role per activity, so please choose a different name for " + r[1] + "."; roleInputs(r[0])[0].focus(); }
         else held[k] = r[1];
       });
     });
     if (dupMsg) { msg.textContent = dupMsg; return; }
-    var nCl = splitNames($("a_cleaners").value).length;
-    if (nCl > 3) { msg.textContent = "Cleaners can have up to 3 names. You entered " + nCl + ". Please remove " + (nCl - 3) + "."; $("a_cleaners").focus(); return; }
     var row = { bs_date: date, notes: $("a_notes").value.trim() || null, lesson: $("a_lesson").value.trim() || null, topic_desc: $("a_topic_desc").value.trim() || null, updated_at: new Date().toISOString() };
-    ASN_ROLES.forEach(function (r) { row[r[0]] = $("a_" + r[0]).value.trim() || null; });
+    ASN_ROLES.forEach(function (r) { row[r[0]] = getRoleVal(r[0]) || null; });
     var btn = $("asnSave"); btn.disabled = true; btn.textContent = "Saving...";
     // The database records role changes itself (see role-history.sql). These two fields tell it who made this change.
     var rowA = Object.assign({}, row, { last_actor: getSess("wifiUser") || "Admin", last_actor_at: new Date().toISOString() });
