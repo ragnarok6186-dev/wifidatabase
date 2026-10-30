@@ -197,6 +197,42 @@ legend { padding: 0; font-size: .72rem; letter-spacing: .07em; text-transform: u
   td.first::before { content: none; }
 }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+/* dashboard */
+.sheet.dash { max-width: 1100px; }
+.dashbody { padding: 16px 20px 24px; display: flex; flex-direction: column; gap: 24px; }
+.dashbody h3 { font-family: var(--font-display); font-weight: 600; font-size: 1.1rem; margin: 0 0 8px; }
+.dashbody .muted { margin: 0; color: var(--muted); font-size: .9rem; }
+.tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 12px; }
+.tile { border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; background: var(--surface); display: flex; flex-direction: column; gap: 2px; }
+.tile b { font-family: var(--font-display); font-size: 2rem; line-height: 1.1; font-weight: 600; font-variant-numeric: tabular-nums; }
+.tile span { color: var(--ink); font-size: .92rem; }
+.tile small { color: var(--muted); font-size: .8rem; }
+.lhead, .lrow { display: grid; grid-template-columns: minmax(140px, 1.1fr) minmax(130px, 1.2fr) minmax(130px, 1.2fr) minmax(110px, 1fr) 76px; gap: 8px; align-items: center; }
+.lhead { font-size: .75rem; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); padding: 0 4px 6px; }
+.lrow { padding: 10px 4px; border-top: 1px solid var(--line); }
+.lrow input { width: 100%; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); min-height: 38px; }
+.lrow .gn b { display: block; }
+.lrow .gn small, .lrow .lc { color: var(--muted); font-size: .82rem; }
+.lrow .lc a { color: var(--accent); text-decoration: none; display: block; }
+.addgroup { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+.addgroup input { flex: 1 1 200px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); min-height: 40px; }
+.dgrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 14px; }
+.dcard { border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.dcard h3 { margin: 0; }
+.bar { display: grid; grid-template-columns: minmax(80px, 150px) 1fr 36px; gap: 10px; align-items: center; font-size: .9rem; }
+.bar .bl { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bar .track { background: var(--accent-soft); border-radius: 6px; height: 10px; display: block; overflow: hidden; }
+.bar .track i { display: block; height: 100%; background: var(--accent); border-radius: 6px; }
+.bar b { text-align: right; font-variant-numeric: tabular-nums; }
+.ucards { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
+.ucard { border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; display: flex; flex-direction: column; gap: 6px; }
+.ucard b { font-family: var(--font-display); font-size: 1.1rem; font-weight: 600; }
+.ucard .sub, .ucard .open { color: var(--muted); font-size: .88rem; }
+.ucard .open.ok { color: var(--good); }
+@media (max-width: 760px) {
+  .lhead { display: none; }
+  .lrow { grid-template-columns: 1fr; }
+}
 </style>
 </head>
 <body>
@@ -248,6 +284,7 @@ legend { padding: 0; font-size: .72rem; letter-spacing: .07em; text-transform: u
       <p id="whoami">Member records for the group.</p>
     </div>
     <div class="actions">
+      <button class="btn" id="dashBtn" type="button">Dashboard</button>
       <button class="btn" id="importBtn" type="button">Import Excel</button>
       <button class="btn" id="exportBtn" type="button">Export Excel</button>
       <button class="btn" id="asnBtn" type="button">Assignments</button>
@@ -352,6 +389,38 @@ legend { padding: 0; font-size: .72rem; letter-spacing: .07em; text-transform: u
         </div>
       </div>
     </form>
+  </div>
+</div>
+
+<!-- Dashboard -->
+<div class="overlay" id="dashOverlay" hidden>
+  <div class="sheet dash" role="dialog" aria-modal="true" aria-labelledby="dashTitle">
+    <header>
+      <h2 id="dashTitle">Dashboard</h2>
+      <div class="htools">
+        <button class="btn" type="button" id="dashRefresh">Refresh</button>
+        <button class="btn" type="button" id="dashClose">Close</button>
+      </div>
+    </header>
+    <div class="dashbody">
+      <div class="tiles" id="dTiles"></div>
+      <section aria-labelledby="dLeadTitle">
+        <h3 id="dLeadTitle">Bible study group leaders</h3>
+        <p class="muted" id="dLeadNote"></p>
+        <div class="lhead"><span>Group</span><span>Leader</span><span>Co-leader (optional)</span><span>Contact</span><span></span></div>
+        <div id="dLeaders"></div>
+        <datalist id="leaderNames"></datalist>
+        <div class="addgroup">
+          <input id="dNewGroup" placeholder="Add a group that has no members yet" autocomplete="off" aria-label="New group name">
+          <button class="btn" type="button" id="dAddGroup">Add group</button>
+        </div>
+      </section>
+      <section aria-labelledby="dUpTitle">
+        <h3 id="dUpTitle">Upcoming activities</h3>
+        <div class="ucards" id="dUpcoming"></div>
+      </section>
+      <div class="dgrid" id="dCharts"></div>
+    </div>
   </div>
 </div>
 
@@ -1812,6 +1881,154 @@ legend { padding: 0; font-size: .72rem; letter-spacing: .07em; text-transform: u
   });
 
   // ---------- start ----------
+  // ---------- dashboard ----------
+  var dashLeaders = {}, dashLeadersOk = true, dashLeadersNote = "", dashAsn = [], extraGroups = [];
+  var DROLES = ASN_ROLES.filter(function (r) { return r[0] !== "topic"; });
+  function pct(n, t) { return t ? Math.round(n * 100 / t) + "%" : "0%"; }
+  function countBy(field, blank) {
+    var c = {};
+    members.forEach(function (m) { var v = String(m[field] == null ? "" : m[field]).trim() || blank; c[v] = (c[v] || 0) + 1; });
+    return Object.keys(c).map(function (k) { return { label: k, n: c[k] }; });
+  }
+  function groupNames() {
+    var seen = {}, out = [];
+    uniq("group").concat(Object.keys(dashLeaders).map(function (k) { return dashLeaders[k].name; }), extraGroups).forEach(function (g) {
+      var k = String(g).trim().toLowerCase(); if (k && !seen[k]) { seen[k] = true; out.push(String(g).trim()); }
+    });
+    return out.sort(function (a, b) { return a.localeCompare(b, undefined, { numeric: true }); });
+  }
+  function leaderOf(g) { var e = dashLeaders[String(g).toLowerCase()]; return e ? String(e.leaders || "").trim() : ""; }
+  function memberByName(n) {
+    var k = String(n).trim().toLowerCase();
+    return members.filter(function (m) { return fullName(m).toLowerCase() === k || (m.nickname && String(m.nickname).trim().toLowerCase() === k); })[0] || null;
+  }
+  function barCard(title, entries, byCount) {
+    entries.sort(byCount ? function (a, b) { return b.n - a.n || a.label.localeCompare(b.label); } : function (a, b) { return a.label.localeCompare(b.label, undefined, { numeric: true }); });
+    var max = Math.max.apply(null, entries.map(function (e) { return e.n; }).concat([1]));
+    var card = h("div", { class: "dcard" }, h("h3", { text: title }));
+    if (!entries.length) card.append(h("p", { class: "muted", text: "No data yet." }));
+    entries.forEach(function (e) {
+      card.append(h("div", { class: "bar" }, h("span", { class: "bl", text: e.label, title: e.label }),
+        h("span", { class: "track" }, h("i", { style: "width:" + Math.max(3, Math.round(e.n * 100 / max)) + "%" })), h("b", { text: String(e.n) })));
+    });
+    return card;
+  }
+  function tile(num, label, sub) { return h("div", { class: "tile" }, h("b", { text: String(num) }), h("span", { text: label }), sub ? h("small", { text: sub }) : null); }
+  function renderDashTiles() {
+    var total = members.length, groups = groupNames(), thisYear = new Date().getFullYear(), today = isoLocal(new Date());
+    var cgm = members.filter(function (m) { return m.cgm === "Yes"; }).length, bap = members.filter(function (m) { return m.bap === "Yes"; }).length;
+    var board = members.filter(function (m) { return m.role === "Board"; }).length;
+    var married = members.filter(function (m) { return m.civil === "Married"; }).length;
+    var joined = members.filter(function (m) { return Number(m.yearJoined) === thisYear; }).length;
+    var noGroup = members.filter(function (m) { return !String(m.group || "").trim(); }).length;
+    var withLeader = groups.filter(function (g) { return leaderOf(g); }).length;
+    var up = dashAsn.filter(function (a) { return a.bs_date >= today; });
+    var next = up[0], nextOpen = next ? DROLES.filter(function (r) { return (r[0] in next) && !String(next[r[0]] || "").trim(); }).length : 0;
+    var box = $("dTiles"); box.textContent = "";
+    [tile(total, "Members", noGroup ? noGroup + " without a BS group" : "All have a BS group"),
+     tile(groups.length, "BS groups", withLeader + " with a leader named"),
+     tile(board, "Board members", pct(board, total) + " of members"),
+     tile(cgm, "In a CGM", pct(cgm, total) + " of members"),
+     tile(bap, "Baptized", pct(bap, total) + " of members"),
+     tile(married, "Married", pct(married, total) + " of members"),
+     tile(joined, "Joined in " + thisYear, "Year joined FCC"),
+     tile(up.length, "Upcoming activities", next ? "Next: " + dateLabelLong(next.bs_date) : "None scheduled"),
+     tile(next ? nextOpen : "-", "Open roles, next activity", next ? (nextOpen ? "Still to be filled" : "All filled") : "")
+    ].forEach(function (t) { box.append(t); });
+  }
+  function dateLabelLong(iso) {
+    var p = parseDate(iso); if (!p) return iso;
+    return new Date(p.y, p.m - 1, p.d).toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" });
+  }
+  function renderLeaders() {
+    var box = $("dLeaders"), groups = groupNames();
+    box.textContent = "";
+    $("dLeadNote").textContent = dashLeadersNote || (groups.length ? "Type a name or pick from the list, then press Save on that row." : "No BS groups yet. Add a group below, or give members a BS group.");
+    var dl = $("leaderNames"); dl.textContent = "";
+    members.map(fullName).sort(function (a, b) { return a.localeCompare(b); }).forEach(function (n) { dl.append(h("option", { value: n })); });
+    groups.forEach(function (g) {
+      var ms = members.filter(function (m) { return String(m.group || "").trim().toLowerCase() === g.toLowerCase(); });
+      var parts = splitNames(leaderOf(g)), first = parts[0] || "", second = parts.slice(1).join(" & ");
+      var i1 = h("input", { list: "leaderNames", placeholder: "Leader", autocomplete: "off", "aria-label": "Leader of " + g }); i1.value = first;
+      var i2 = h("input", { list: "leaderNames", placeholder: "Co-leader", autocomplete: "off", "aria-label": "Co-leader of " + g }); i2.value = second;
+      var contact = h("div", { class: "lc" });
+      [first, second].forEach(function (n) {
+        var m = n ? memberByName(n) : null;
+        if (m && m.mobile) contact.append(h("a", { href: "tel:" + String(m.mobile).replace(/[^\d+]/g, ""), text: m.mobile }));
+      });
+      var save = h("button", { class: "btn sm", type: "button", text: "Save" });
+      save.addEventListener("click", function () {
+        var a = i1.value.trim(), b = i2.value.trim();
+        if (a && b && a.toLowerCase() === b.toLowerCase()) { toast("Please choose two different people."); return; }
+        if (!dashLeadersOk) { toast(dashLeadersNote || "Group leaders are not set up yet."); return; }
+        var val = [a, b].filter(Boolean).join(" & ");
+        save.disabled = true;
+        sb.from("bs_group_leaders").upsert({ group_name: g, leaders: val || null, updated_at: new Date().toISOString() }, { onConflict: "group_name" }).then(function (res) {
+          save.disabled = false;
+          if (res.error) { toast("Could not save. " + (res.error.message || "")); return; }
+          dashLeaders[g.toLowerCase()] = { name: g, leaders: val };
+          renderDashTiles(); toast("Saved the leaders of " + g + ".");
+        }, function () { save.disabled = false; toast("Could not reach the database. Try again."); });
+      });
+      box.append(h("div", { class: "lrow" },
+        h("div", { class: "gn" }, h("b", { text: g }), h("small", { text: ms.length + (ms.length === 1 ? " member" : " members") + " \u00b7 " + ms.filter(function (m) { return m.cgm === "Yes"; }).length + " in a CGM" })),
+        i1, i2, contact, save));
+    });
+  }
+  function renderDashUpcoming() {
+    var box = $("dUpcoming"), today = isoLocal(new Date()), up = dashAsn.filter(function (a) { return a.bs_date >= today; }).slice(0, 4);
+    box.textContent = "";
+    if (!up.length) { box.append(h("p", { class: "muted", text: "No upcoming activities. Add them under Assignments." })); return; }
+    up.forEach(function (a) {
+      var roles = DROLES.filter(function (r) { return r[0] in a; });
+      var open = roles.filter(function (r) { return !String(a[r[0]] || "").trim(); });
+      var filled = roles.length - open.length;
+      var sub = [a.lesson, a.topic].filter(Boolean).join(" \u2014 ");
+      box.append(h("div", { class: "ucard" },
+        h("b", { text: dateLabelLong(a.bs_date) }),
+        sub ? h("div", { class: "sub", text: sub }) : null,
+        h("div", { class: "bar", style: "grid-template-columns:1fr 70px" }, h("span", { class: "track" }, h("i", { style: "width:" + (roles.length ? Math.round(filled * 100 / roles.length) : 0) + "%" })), h("b", { text: filled + " / " + roles.length })),
+        h("div", { class: "open" + (open.length ? "" : " ok"), text: open.length ? "Still open: " + open.map(function (r) { return r[1]; }).join(", ") : "All roles are filled." })));
+    });
+  }
+  function renderDashCharts() {
+    var box = $("dCharts"); box.textContent = "";
+    [barCard("Members by BS group", countBy("group", "No group"), true),
+     barCard("Auxiliary", countBy("aux", "Not set"), true),
+     barCard("Location", countBy("loc", "Not set"), true),
+     barCard("Civil status", countBy("civil", "Not set"), true),
+     barCard("Board and members", countBy("role", "Not set"), true),
+     barCard("Year joined FCC", countBy("yearJoined", "Not set"), false)
+    ].forEach(function (c) { box.append(c); });
+  }
+  function renderDash() { renderDashTiles(); renderLeaders(); renderDashUpcoming(); renderDashCharts(); }
+  function loadDash() {
+    $("dLeadNote").textContent = "Loading...";
+    var p1 = sb.from("bs_group_leaders").select("*").then(function (res) {
+      if (res.error) throw res.error;
+      dashLeadersOk = true; dashLeadersNote = ""; dashLeaders = {};
+      (res.data || []).forEach(function (r) { dashLeaders[String(r.group_name).toLowerCase()] = { name: r.group_name, leaders: r.leaders || "" }; });
+    }).catch(function (e) {
+      dashLeadersOk = false; dashLeaders = {};
+      dashLeadersNote = (e && (e.code === "42P01" || e.code === "PGRST205" || /does not exist|schema cache/i.test(e.message || "")))
+        ? "Group leaders are not set up yet. Run bs-group-leaders.sql in Supabase, then press Refresh."
+        : "Could not load the group leaders. Check your connection and press Refresh.";
+    });
+    var p2 = sb.from("bs_assignments").select("*").order("bs_date", { ascending: true }).limit(500).then(function (res) {
+      dashAsn = res.error ? [] : (res.data || []);
+    }).catch(function () { dashAsn = []; });
+    return Promise.all([p1, p2]).then(renderDash);
+  }
+  $("dashBtn").addEventListener("click", function () { $("dashOverlay").hidden = false; renderDash(); loadDash(); });
+  $("dashClose").addEventListener("click", function () { $("dashOverlay").hidden = true; });
+  $("dashRefresh").addEventListener("click", function () { Promise.resolve(loadAll()).then(loadDash); });
+  $("dAddGroup").addEventListener("click", function () {
+    var n = $("dNewGroup").value.trim(); if (!n) return;
+    if (groupNames().some(function (g) { return g.toLowerCase() === n.toLowerCase(); })) { toast("That group is already in the list."); return; }
+    extraGroups.push(n); $("dNewGroup").value = ""; renderDash(); toast("Group added. Enter its leaders and press Save.");
+  });
+  document.addEventListener("keydown", function (ev) { if (ev.key === "Escape" && !$("dashOverlay").hidden) $("dashOverlay").hidden = true; });
+
   function start() {
     if (!window.supabase || !window.supabase.createClient) {
       show("login"); $("loginMsg").textContent = "The page could not load its database library. Check your connection and reload."; return;
