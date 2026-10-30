@@ -386,6 +386,7 @@ legend { padding: 0; font-size: .72rem; letter-spacing: .07em; text-transform: u
     </header>
     <form id="asnForm" novalidate>
       <datalist id="namesList"></datalist>
+      <datalist id="teamNamesList"></datalist>
       <div class="grid">
         <div class="field"><label for="a_date">Date</label><input id="a_date" type="date" required></div>
         <div class="field"><label for="a_lesson">Lesson <span class="opt">(e.g. Lesson 6)</span></label><input id="a_lesson" autocomplete="off" placeholder="Lesson 6 or Inter-BS Fellowship"></div>
@@ -396,8 +397,8 @@ legend { padding: 0; font-size: .72rem; letter-spacing: .07em; text-transform: u
         <div class="field"><label for="a_opening_prayer">Opening &amp; Food Prayer</label><input id="a_opening_prayer" list="namesList" autocomplete="off"></div>
         <div class="field"><label for="a_pw_lead">Lead for P&amp;W</label><input id="a_pw_lead" list="namesList" autocomplete="off"></div>
         <div class="field"><label for="a_closing_prayer">Closing Prayer</label><input id="a_closing_prayer" list="namesList" autocomplete="off"></div>
-        <div class="field" style="grid-column:1/-1" role="group" aria-label="Food Preparation"><label for="a_food_prep_1">Food Preparation <span class="opt">(2 to 3 names)</span></label><div class="trio"><input id="a_food_prep_1" list="namesList" autocomplete="off" placeholder="Name 1"><input id="a_food_prep_2" list="namesList" autocomplete="off" placeholder="Name 2"><input id="a_food_prep_3" list="namesList" autocomplete="off" placeholder="Name 3 (optional)"></div></div>
-        <div class="field" style="grid-column:1/-1" role="group" aria-label="Cleaners"><label for="a_cleaners_1">Cleaners <span class="opt">(2 to 3 names)</span></label><div class="trio"><input id="a_cleaners_1" list="namesList" autocomplete="off" placeholder="Name 1"><input id="a_cleaners_2" list="namesList" autocomplete="off" placeholder="Name 2"><input id="a_cleaners_3" list="namesList" autocomplete="off" placeholder="Name 3 (optional)"></div></div>
+        <div class="field" style="grid-column:1/-1" role="group" aria-label="Food Preparation"><label for="a_food_prep_1">Food Preparation <span class="opt">(2 to 3 names)</span></label><div class="trio"><input id="a_food_prep_1" list="teamNamesList" autocomplete="off" placeholder="Name 1"><input id="a_food_prep_2" list="teamNamesList" autocomplete="off" placeholder="Name 2"><input id="a_food_prep_3" list="teamNamesList" autocomplete="off" placeholder="Name 3 (optional)"></div></div>
+        <div class="field" style="grid-column:1/-1" role="group" aria-label="Cleaners"><label for="a_cleaners_1">Cleaners <span class="opt">(2 to 3 names)</span></label><div class="trio"><input id="a_cleaners_1" list="teamNamesList" autocomplete="off" placeholder="Name 1"><input id="a_cleaners_2" list="teamNamesList" autocomplete="off" placeholder="Name 2"><input id="a_cleaners_3" list="teamNamesList" autocomplete="off" placeholder="Name 3 (optional)"></div></div>
         <div class="field" style="grid-column:1/-1"><label for="a_notes">Notes <span class="opt">(optional)</span></label><input id="a_notes" autocomplete="off"></div>
       </div>
       <p class="msg" id="asnFormMsg" role="alert"></p>
@@ -834,6 +835,8 @@ legend { padding: 0; font-size: .72rem; letter-spacing: .07em; text-transform: u
   var asn = [], asnEditing = null, asnDelTimer = null;
   // Food Preparation and Cleaners have three name boxes each; the names are saved joined with " & ".
   var MULTI = { food_prep: 1, cleaners: 1 }, MAX_NAMES = 3;
+  var TEAMS = ["Team De Jesus", "Team Ortega", "Team Villanueva", "Team Pena"];   // choices for Food Preparation and Cleaners
+  function isTeam(n) { return TEAMS.some(function (t) { return t.toLowerCase() === String(n).trim().toLowerCase(); }); }
   function roleInputs(key) { return MULTI[key] ? [1, 2, 3].map(function (i) { return $("a_" + key + "_" + i); }) : [$("a_" + key)]; }
   function getRoleVal(key) { return roleInputs(key).map(function (el) { return el.value.trim(); }).filter(Boolean).join(" & "); }
   function setRoleVal(key, v) {
@@ -913,6 +916,8 @@ legend { padding: 0; font-size: .72rem; letter-spacing: .07em; text-transform: u
     $("asnFormMsg").textContent = ""; resetAsnDel();
     var dl = $("namesList"); dl.textContent = "";
     members.map(fullName).sort().forEach(function (n) { var o = document.createElement("option"); o.value = n; dl.append(o); });
+    var tl = $("teamNamesList"); tl.textContent = "";   // the four teams first, then every member
+    TEAMS.concat(members.map(fullName).sort()).forEach(function (n) { var o = document.createElement("option"); o.value = n; tl.append(o); });
     $("a_date").value = a ? a.bs_date : nextFreeSaturday();
     ASN_ROLES.forEach(function (r) { setRoleVal(r[0], a ? (a[r[0]] || "") : ""); });
     $("a_notes").value = a ? (a.notes || "") : "";
@@ -962,6 +967,7 @@ legend { padding: 0; font-size: .72rem; letter-spacing: .07em; text-transform: u
       splitNames(getRoleVal(r[0])).forEach(function (n) {
         if (dupMsg) return;
         var k = n.toLowerCase();
+        if (isTeam(n)) return;
         if (held[k] && held[k] !== r[1]) { dupMsg = n + " is already assigned as " + held[k] + ". One person can only have one role per activity, so please choose a different name for " + r[1] + "."; roleInputs(r[0])[0].focus(); }
         else held[k] = r[1];
       });
