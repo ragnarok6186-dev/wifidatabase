@@ -836,6 +836,8 @@ legend { padding: 0; font-size: .72rem; letter-spacing: .07em; text-transform: u
   // Food Preparation and Cleaners have three name boxes each; the names are saved joined with " & ".
   var MULTI = { food_prep: 1, cleaners: 1 }, MAX_NAMES = 3;
   var TEAMS = ["Team De Jesus", "Team Ortega", "Team Villanueva", "Team Pena"];   // choices for Food Preparation and Cleaners
+  var NICKMAP = {};   // nickname (lower case) -> that member's full name (lower case), when the nickname is unique
+  function personKey(n) { var k = String(n).trim().toLowerCase(); return NICKMAP[k] || k; }
   function isTeam(n) { return TEAMS.some(function (t) { return t.toLowerCase() === String(n).trim().toLowerCase(); }); }
   function roleInputs(key) { return MULTI[key] ? [1, 2, 3].map(function (i) { return $("a_" + key + "_" + i); }) : [$("a_" + key)]; }
   function getRoleVal(key) { return roleInputs(key).map(function (el) { return el.value.trim(); }).filter(Boolean).join(" & "); }
@@ -917,7 +919,15 @@ legend { padding: 0; font-size: .72rem; letter-spacing: .07em; text-transform: u
     var dl = $("namesList"); dl.textContent = "";
     members.map(fullName).sort().forEach(function (n) { var o = document.createElement("option"); o.value = n; dl.append(o); });
     var tl = $("teamNamesList"); tl.textContent = "";   // the four teams first, then every member
-    TEAMS.concat(members.map(fullName).sort()).forEach(function (n) { var o = document.createElement("option"); o.value = n; tl.append(o); });
+    // members are listed by nickname (first name if they have none); if two people would share a label, the full name is used
+    var lab = members.map(function (m) { return { full: fullName(m), pick: String(m.nickname || m.firstName || "").trim() }; }), cnt = {};
+    lab.forEach(function (x) { var k = x.pick.toLowerCase(); cnt[k] = (cnt[k] || 0) + 1; });
+    NICKMAP = {};
+    var picks = lab.map(function (x) {
+      if (!x.pick || cnt[x.pick.toLowerCase()] > 1) return x.full;
+      NICKMAP[x.pick.toLowerCase()] = x.full.toLowerCase(); return x.pick;
+    }).sort(function (a, b) { return a.localeCompare(b); });
+    TEAMS.concat(picks).forEach(function (n) { var o = document.createElement("option"); o.value = n; tl.append(o); });
     $("a_date").value = a ? a.bs_date : nextFreeSaturday();
     ASN_ROLES.forEach(function (r) { setRoleVal(r[0], a ? (a[r[0]] || "") : ""); });
     $("a_notes").value = a ? (a.notes || "") : "";
@@ -956,7 +966,7 @@ legend { padding: 0; font-size: .72rem; letter-spacing: .07em; text-transform: u
       if (MULTI[r[0]]) {   // the same name in two boxes of one role
         var seenIn = {};
         roleInputs(r[0]).forEach(function (el) {
-          var n = el.value.trim(), k = n.toLowerCase();
+          var n = el.value.trim(), k = personKey(n);
           if (!n || dupMsg) return;
           if (seenIn[k]) { dupMsg = n + " is listed twice in " + r[1] + ". Please use a different name."; el.focus(); } else seenIn[k] = true;
         });
@@ -966,7 +976,7 @@ legend { padding: 0; font-size: .72rem; letter-spacing: .07em; text-transform: u
       }
       splitNames(getRoleVal(r[0])).forEach(function (n) {
         if (dupMsg) return;
-        var k = n.toLowerCase();
+        var k = personKey(n);
         if (isTeam(n)) return;
         if (held[k] && held[k] !== r[1]) { dupMsg = n + " is already assigned as " + held[k] + ". One person can only have one role per activity, so please choose a different name for " + r[1] + "."; roleInputs(r[0])[0].focus(); }
         else held[k] = r[1];
