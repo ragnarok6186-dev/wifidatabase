@@ -418,17 +418,17 @@ legend { padding: 0; font-size: .72rem; letter-spacing: .07em; text-transform: u
       var sub = [a.lesson, a.topic ? a.topic + (a.topic_desc ? " (" + a.topic_desc + ")" : "") : ""].filter(Boolean).join(" \u2014 ");
       if (sub) card.append(mk("div", "rsub", sub));
       ROLE_ROWS.forEach(function (r) {
-        if (r[0] === "cleaners" && !("cleaners" in a)) return;   // shown once the Cleaners field exists in the database
+        var noField = r[0] === "cleaners" && !("cleaners" in a);   // the server is not sending Cleaners yet: show the row, but no sign-up button
         var v = String(a[r[0]] || "").trim(), names = v ? v.split(" & ").map(function (x) { return x.trim(); }) : [];
         var mine = names.some(isMe);
         var shown = (r[0] === "food_prep" || r[0] === "cleaners") ? names.map(function (x) { return LABEL_OF[x.toLowerCase()] || x; }).join(" & ") : v;
         var row = mk("div", "rrow");
         row.append(mk("span", "rl", r[1]));
-        row.append(mk("span", "rv" + (!v ? " open" : mine ? " me" : ""), v ? (mine && names.length === 1 ? "You" : shown) : (r[2] ? "Open" : "To be assigned")));
+        row.append(mk("span", "rv" + (!v ? " open" : mine ? " me" : ""), v ? (mine && names.length === 1 ? "You" : shown) : (r[2] && !noField ? "Open" : "To be assigned")));
         var act = mk("span");
         if (r[2]) {
           var otherRole = !mine && heldRole && heldRole !== r[0];
-          var canJoin = !mine && !otherRole && (!v || ((r[0] === "food_prep" || r[0] === "cleaners") && names.length < 3));
+          var canJoin = !noField && !mine && !otherRole && (!v || ((r[0] === "food_prep" || r[0] === "cleaners") && names.length < 3));
           if (mine) { var rel = mk("button", "btn sm ghost", "Remove me"); rel.type = "button"; rel.addEventListener("click", function () { claim(a.id, r[0], true, rel); }); act.append(rel); }
           else if (otherRole) { act.append(mk("span", "hint", "Already have a role")); }
           else if (canJoin) { var go = mk("button", "btn sm", v ? "Join" : "Sign up"); go.type = "button"; go.addEventListener("click", function () { claim(a.id, r[0], false, go); }); act.append(go); }
