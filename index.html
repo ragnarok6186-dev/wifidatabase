@@ -380,6 +380,7 @@ legend { padding: 0; font-size: .72rem; letter-spacing: .07em; text-transform: u
           <div class="field" id="bapYearWrap" hidden><label for="bapYear">Baptism year</label><input id="bapYear" name="bapYear" type="number" min="1900" max="2100" inputmode="numeric" placeholder="2020"></div>
         </div>
       </fieldset>
+      <p class="hsrc" id="lastEdit" hidden></p>
       <p class="msg" id="formMsg" role="alert"></p>
       <div class="foot">
         <button class="btn danger" type="button" id="delBtn" hidden>Delete member</button>
@@ -649,7 +650,7 @@ legend { padding: 0; font-size: .72rem; letter-spacing: .07em; text-transform: u
     return row;
   }
   function fromRow(r) {
-    var m = { id: r.id };
+    var m = { id: r.id, updatedBy: r.updated_by || "", updatedAt: r.updated_at || "" };
     MAP.forEach(function (p) {
       var v = r[p[1]];
       m[p[0]] = v == null ? (NUMERIC[p[0]] ? null : "") : v;
@@ -836,6 +837,7 @@ legend { padding: 0; font-size: .72rem; letter-spacing: .07em; text-transform: u
     resetDelete();
     $("formMsg").textContent = "";
     FIELDS.forEach(function (f) { $(f).value = m && m[f] != null ? m[f] : ""; });
+    var le = m ? editedLine(m.updatedBy, m.updatedAt) : ""; $("lastEdit").textContent = le; $("lastEdit").hidden = !le;
     syncConditional();
     $("overlay").hidden = false;
     $("surname").focus();
@@ -861,9 +863,12 @@ legend { padding: 0; font-size: .72rem; letter-spacing: .07em; text-transform: u
     if (data.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)) { msg.textContent = "The email address does not look right. Check it for typing errors."; $("email").focus(); return; }
     var btn = $("saveBtn"); btn.disabled = true;
     var wasEdit = !!editingId;
-    var op = wasEdit
-      ? sb.from("members").update(toRow(data)).eq("id", editingId).select()
-      : sb.from("members").insert(toRow(data)).select();
+    var row = toRow(data); row.updated_by = getSess("wifiUser") || "Admin";   // who made this edit
+    function writeMember(r) { return wasEdit ? sb.from("members").update(r).eq("id", editingId).select() : sb.from("members").insert(r).select(); }
+    var op = writeMember(row).then(function (res) {
+      if (res.error && /updated_by/i.test(res.error.message || "")) { delete row.updated_by; return writeMember(row); }   // member-editor.sql not run yet: save without it
+      return res;
+    });
     op.then(function (res) {
       if (res.error) throw res.error;
       if (!res.data || !res.data.length) throw { message: "Nothing was saved. The member may have been deleted or you may not have permission." };
@@ -931,6 +936,11 @@ legend { padding: 0; font-size: .72rem; letter-spacing: .07em; text-transform: u
     return isoLocal(d);
   }
   function val(a, k) { return String(a[k] || "").trim(); }
+  function editedLine(who, when) {
+    if (!who) return "";
+    var d = when ? new Date(when) : null, t = d && !isNaN(d) ? d.toLocaleString("en-GB", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "";
+    return "Last edited by " + who + (t ? " \u00b7 " + t : "");
+  }
   function asnMessage(a) {
     var lines = ["Bible Study - " + (val(a, "lesson") ? val(a, "lesson") + " - " : "") + asnLabel(a.bs_date)];
     ASN_ROLES.forEach(function (r) {
@@ -962,6 +972,7 @@ legend { padding: 0; font-size: .72rem; letter-spacing: .07em; text-transform: u
       });
       var kids = [head, dl];
       if (val(a, "notes")) kids.push(h("div", { class: "hsrc", text: "Note: " + val(a, "notes") }));
+      if (val(a, "last_actor")) kids.push(h("div", { class: "hsrc", text: editedLine(val(a, "last_actor"), a.last_actor_at || a.updated_at) }));
       kids.push(h("div", { class: "abtns" },
         h("button", { class: "btn", type: "button", text: "Edit", onclick: function () { openAsn(a); } }),
         h("button", { class: "btn", type: "button", text: "Copy message", onclick: function () { copyText(asnMessage(a), "Message copied. Paste it in your group chat."); } })));
